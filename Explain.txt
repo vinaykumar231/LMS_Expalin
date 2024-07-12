@@ -600,7 +600,7 @@ async def get_google_map_reviews():
 
 ##################################################################################################################################
 
-                                Scarap google map reviews and feedback data by using apify 
+                                send and receive message from watshap using twilio third aprty api
 #####################################################################################################################################
 
     Setting up Twilio for WhatsApp:
@@ -609,7 +609,7 @@ async def get_google_map_reviews():
 (b) In your Twilio console, find the "Messaging" section and look for "WhatsApp".
 (c) Set up a WhatsApp Sandbox, which is a testing environment Twilio provides.
 (d) Follow Twilio's instructions to connect your WhatsApp number to the Sandbox.
-
+ for receiving massage  or that first we need to make api reply watshap after that create ngrok link than got to wats' masg senbox pasate this ngrok link
 Connecting your application to Twilio:
 
 (a) Install the Twilio Python library:
@@ -640,11 +640,71 @@ from twilio.request_validator import RequestValidator ##from twilio.request_vali
                                                                     # Handle invalid request
                                                                     raise ValueError("Invalid Twilio request")
 
+code :-
 account_sid = 'ACc882424ebd68dd3f40eb4eda1998fbac'  # Replace with your Twilio Account SID
 auth_token = '2e8b2724834ed1099cd1ed1b30bcf161'     # Replace with your Twilio Auth Token
 
 client = Client(account_sid, auth_token)
 validator = RequestValidator(auth_token)
+
+@router.post("/reply")
+async def whatsapp(request: Request, db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        message = form_data.get("Body", "").strip().lower()
+        from_number = form_data.get("From", "").replace('whatsapp:', '')
+        
+        if not message or not from_number:
+            raise ValueError("Missing required fields: Body or From")
+        
+        aadhaar_user = db.query(AadhaarCard).filter(AadhaarCard.phone_number == from_number).first()
+        pan_user = db.query(PanCard).filter(PanCard.phone_number == from_number).first()
+        user = db.query(User).filter(User.phone_number == from_number).first()
+
+        # Define the current state based on user data
+        if not aadhaar_user:
+            state = "START"
+        elif not aadhaar_user.aadhar_number:
+            state = "AADHAAR"
+        elif aadhaar_user.confirmation_status == 'pending':
+            state = "AADHAAR_CONFIRM"
+        elif aadhaar_user.confirmation_status == 'confirmed' and not pan_user:
+            state = "PAN"
+        elif pan_user and pan_user.confirmation_status == 'pending':
+            state = "PAN_CONFIRM"
+        else:
+            state = "COMPLETE"
+
+        if message == "hi":
+            if state == "START":
+                aadhaar_user = AadhaarCard(phone_number=from_number)
+                db.add(aadhaar_user)
+                db.commit()
+                user = User(phone_number=from_number)
+                db.add(user)
+                db.commit()
+
+                response = "Welcome! Your number has been registered. Please provide your Aadhaar card image for KYC."
+            else:
+            response = f"I'm sorry, I didn't understand that. Your current status is: {state}. Please type 'help' for assistance."
+
+        client.messages.create(
+            from_='whatsapp:+14155238886',
+            to=f'whatsapp:{from_number}',
+            body=response
+        )
+        
+        return {"status": "success", "message": "Message processed successfully"}
+    
+    except Exception as e:
+        print(f"Error processing request: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Error processing request: {str(e)}"
+            }
+        )
 
  ***************************** git all command **************
 
@@ -692,6 +752,10 @@ git checkout branch_name
 
  for add new Column in table
  ALTER TABLE table_name ADD COLUMN new_column_name VARCHAR(233);
+
+ Rename a column:
+ ALTER TABLE parent_information 
+CHANGE COLUMN old_column_name new_column_name datatype;
 
 delete all table data
 TRUNCATE TABLE table_name;
