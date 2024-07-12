@@ -598,7 +598,54 @@ async def get_google_map_reviews():
         else:
             raise HTTPException(status_code=500, detail="Failed to fetch data from Apify")
 
-    
+##################################################################################################################################
+
+                                Scarap google map reviews and feedback data by using apify 
+#####################################################################################################################################
+
+    Setting up Twilio for WhatsApp:
+
+(a) Sign up for a Twilio account if you haven't already.
+(b) In your Twilio console, find the "Messaging" section and look for "WhatsApp".
+(c) Set up a WhatsApp Sandbox, which is a testing environment Twilio provides.
+(d) Follow Twilio's instructions to connect your WhatsApp number to the Sandbox.
+
+Connecting your application to Twilio:
+
+(a) Install the Twilio Python library:
+pip install twilio
+
+import library
+from twilio.rest import Client  #####from twilio.rest import Client:This line imports the Client class from the Twilio REST API library. The Client is the main interface for interacting with Twilio's services. It allows you to:
+                                example client = Client(account_sid, auth_token)
+                                                message = client.messages.create(
+                                                    body="Hello from Twilio!",
+                                                    from_='whatsapp:+14155238886',
+                                                    to='whatsapp:+1234567890'
+                                                )
+from twilio.request_validator import RequestValidator ##from twilio.request_validator import RequestValidator:
+                                                           This line imports the RequestValidator class. This class is used to validate that incoming requests to your webhook are actually coming from Twilio and not from an impersonator. It helps ensure the security of your application. 
+                                                            Send SMS and WhatsApp messages
+                                                            Make phone calls
+                                                            Manage your Twilio account
+                                                            Interact with other Twilio services
+                                                            example :validator = RequestValidator(auth_token)
+                                                                # When you receive a request
+                                                                is_valid_request = validator.validate(
+                                                                    request_url,
+                                                                    request_form,
+                                                                    twilio_signature
+                                                                )
+                                                                if not is_valid_request:
+                                                                    # Handle invalid request
+                                                                    raise ValueError("Invalid Twilio request")
+
+account_sid = 'ACc882424ebd68dd3f40eb4eda1998fbac'  # Replace with your Twilio Account SID
+auth_token = '2e8b2724834ed1099cd1ed1b30bcf161'     # Replace with your Twilio Auth Token
+
+client = Client(account_sid, auth_token)
+validator = RequestValidator(auth_token)
+
  ***************************** git all command **************
 
  …or create a new repository on the command line
