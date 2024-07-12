@@ -1,0 +1,659 @@
+#######################################################################################################################################################
+                                                     for DataBase connection with Mysql
+#######################################################################################################################################################
+
+                            
+step 1 install:-  pip install pymysql and pip install mysql-connector-python
+step 2 :- write code
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from mysql import connector
+from sqlalchemy.ext.declarative import declarative_base
+
+############################################
+SQLALCHEMY_DATABASE_URL: This string contains the information needed to connect to a MySQL or PostgreSQL database.
+For MySQL, it uses pymysql as the driver.
+For PostgreSQL, it uses psycopg2 as the driver.
+###############################################
+SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:root@localhost:3306/lms_6_june"  #//mysql
+# SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://postgres.fjubgwysqgxcedhwhvdu:y5pD2C5abBLMQjVN@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"  #//postgres
+
+######################################
+create_engine: This function creates an engine that connects to the database specified by SQLALCHEMY_DATABASE_URL.
+SessionLocal: This is a factory for creating new Session objects.
+autocommit=False: Changes are not committed automatically.
+autoflush=False: The session will not automatically flush (i.e., push changes to the database).
+bind=engine: The sessions will use the created engine to connect to the database.
+Base: This is the base class for all ORM models. Models will inherit from this class to gain SQLAlchemy's ORM capabilities.
+####################################
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+############################
+api_response: This function creates a standardized response for API endpoints.
+Parameters:
+status_code: The HTTP status code for the response.
+data: The data to include in the response (default is None).
+message: An optional message to include.
+total: An optional total count of items (default is 0).
+count: An optional count of items in the current response (default is 0).
+Filtered Response: It filters out any keys with values of None or 0 (except status_code and data).
+###########################
+
+def api_response(status_code, data=None, message: str = None, total: int = 0, count: int = 0):
+    response_data = {"data": data, "message": message, "status_code": status_code, "total": total, "count": count}
+    filtered_response = {key: value for key, value in response_data.items() if value is not None or 0}
+    return filtered_response
+
+#####################
+get_db: This function is a dependency for FastAPI endpoints that need database access.
+SessionLocal: Creates a new database session.
+Yield: Provides the session to the caller.
+Finally: Ensures the session is closed after the request is handled, even if an exception occurs.
+##########################
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+#######################################################################################################################################################
+
+                                        for User and admin login or register new user
+#######################################################################################################################################################
+
+
+step 1 :- install all library and packages for login and generate tokens
+
+from sqlalchemy import desc
+from fastapi import Request, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from auth.auth_handler import decodeJWT
+from db.session import get_db
+from sqlalchemy.orm import Session
+from typing import Optional
+from api.models.user import LmsUsers
+from jwt import PyJWTError
+import time
+from typing import Any
+import jwt
+from decouple import config
+from jwt import PyJWTError
+from pydantic import EmailStr, BaseModel
+import bcrypt
+
+step 2 :- write all code
+
+router = APIRouter()
+
+##########
+JWT_SECRET: This is the secret key used to encode and decode the JWT. Think of it as a password that both the server and the JWT token use to ensure the data is secure.
+JWT_ALGORITHM: This specifies the algorithm used to encode the JWT, like HS256.
+##########
+
+JWT_SECRET = config('secret')
+JWT_ALGORITHM = config('algorithm')
+
+
+def token_response(token: str):
+    return {
+        "access_token": token
+    }
+###################
+signJWT: This function creates a JWT.
+Expiration Time: The token is set to expire in 24 hours.
+Payload: The payload includes user_id, user_type, and exp (expiration time).
+Token Creation: The jwt.encode function creates the token.
+##################
+
+def signJWT(user_id: str, user_type: str) -> tuple[Any, float]:
+    expiration_time = time.time() + 1 * 24 * 60 * 60
+    payload = {
+        "user_id": user_id,
+        "user_type": user_type,
+        "exp": expiration_time
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    return token, expiration_time
+
+#################################
+decodeJWT: This function decodes a JWT.
+Token Validation: It checks if the token is expired or if required fields are missing.
+Return: It returns the decoded payload if the token is valid; otherwise, it returns None.
+#################################
+def decodeJWT(token: str) -> Any | None:
+    try:
+        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if decoded_token.get("exp") and decoded_token["exp"] < time.time():
+            return None
+            # Check if the necessary claims are present
+        if "user_id" not in decoded_token or "user_type" not in decoded_token:
+            return None
+        return decoded_token
+    except PyJWTError:
+        return None
+
+####################################################
+JWTBearer: A custom class that extends FastAPI's HTTPBearer class for handling JWT authentication.
+call Method: This method is called during request processing. It:
+Retrieves the credentials.
+Validates the authentication scheme and the JWT.
+Raises an HTTP exception if the token is invalid or expired.
+verify_jwt Method: Static method that uses decodeJWT to verify if a token is valid.
+
+verify_jwt: This static method verifies the JWT.
+decodeJWT: Attempts to decode the JWT.
+Check: Returns True if the payload is not None, meaning the token is valid. If there's an exception, it prints the error and returns False.
+####################################################
+class JWTBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super(JWTBearer, self).__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request):
+        credentials: HTTPAuthorizationCredentials = await super(JWTBearer, self).__call__(request)
+        if credentials:
+            if not credentials.scheme == "Bearer":
+                raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+            if not self.verify_jwt(credentials.credentials):
+                raise HTTPException(status_code=403, detail="Invalid token or expired token.")
+            return credentials.credentials
+        else:
+            raise HTTPException(status_code=403, detail="Invalid authorization code.")
+
+    @staticmethod
+    def verify_jwt(jwt_token: str) -> bool:
+        try:
+            payload = decodeJWT(jwt_token)
+            return payload is not None
+        except Exception as e:
+            print(str(e))
+            return False
+
+#############################################################
+get_user_id_from_token: This function uses the JWTBearer dependency to ensure the token is valid before decoding it.
+decodeJWT: Decodes the token to get the payload.
+Check: If the payload exists, it extracts the user_id from it. If the payload is None, it raises an HTTP 403 error indicating an invalid or expired token.
+#############################################################
+def get_user_id_from_token(token: str = Depends(JWTBearer())):
+    payload = decodeJWT(token)
+
+    if payload:
+        return payload.get("user_id")
+    else:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+
+########################################################
+get_admin: This function depends on get_user_id_from_token to get the user ID from the JWT and on get_db to get a database session.
+Database Query: It queries the LmsUsers table to find the user with the given user_id.
+Checks:
+If no user is found, it raises an HTTP 404 error.
+If the user is found but is not an admin, it raises an HTTP 403 error.
+If the user is an admin, it returns the user object.
+####################################################
+
+def get_admin(user_id: int = Depends(get_user_id_from_token), db: Session = Depends(get_db)) -> Optional[LmsUsers]:
+    user = db.query(LmsUsers).filter(LmsUsers.user_id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.user_type != "admin":
+        raise HTTPException(status_code=403, detail="You are not authorized to perform this action")
+    return user
+
+def get_teacher(user_id: int = Depends(get_user_id_from_token), db: Session = Depends(get_db)) -> Optional[LmsUsers]:
+    user = db.query(LmsUsers).filter(LmsUsers.user_id == user_id).first()
+    if user.user_type != "teacher":
+        raise HTTPException(status_code=403, detail="You are not authorized to perform this action")
+    return user
+
+#################################################################################################################
+
+
+                                            step for new user register
+    ####### Scheema #####
+                                
+    email: str
+    user_password: str
+
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserType(str, Enum):
+    admin = "admin"
+    student = "student"
+    teacher = "teacher"
+    user = "user"
+    parent = "parent"
+
+
+class UserCreate(BaseModel):
+    user_name: str
+    user_email: str
+    user_password: str
+    user_type: UserType = UserType.user
+    phone_no: str
+
+
+class LmsUsers(Base):
+    __tablename__ = "users"
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_name = Column(String(255))
+    user_email = Column(String(255), unique=True)
+    user_password = Column(String(255))
+    user_type = Column(String(100))
+    phone_no = Column(BIGINT)
+    branch_id = Column(Integer, ForeignKey("branches.id"))
+    is_deleted = Column(Boolean, server_default='0', nullable=False)
+    created_on = Column(DateTime, default=func.now())
+    updated_on = Column(TIMESTAMP, server_default=func.now(), onupdate=func.current_timestamp())
+    deleted_on = Column(DateTime)
+    is_payment_done = Column(Boolean, server_default='0', nullable=False)
+    is_formsubmited = Column(Boolean, server_default='0', nullable=False)
+
+
+    demos = relationship("DemoFormFill", back_populates="demo")
+    #payments = relationship("PaymentStatus", back_populates="user")
+    branch = relationship("Branch", back_populates="user")
+
+    student = relationship("Student", back_populates="user")
+
+    teacher = relationship("Teacher", back_populates="user")
+
+    ########################################################################################################################
+    @staticmethod
+    def validate_email(email):
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        return re.match(email_pattern, email)
+
+    @staticmethod
+    def validate_password(password):
+        return len(password) >= 8
+
+    @staticmethod
+    def validate_phone_number(phone_number):
+        phone_pattern = r"^\d{10}$"
+        return re.match(phone_pattern, phone_number)
+
+    @staticmethod
+    def lms_register(data: dict, db: SessionLocal):
+        try:
+
+            if not LmsUsers.validate_email(data.get('user_email')):
+                raise HTTPException(400, detail="Invalid email format")
+
+            if not LmsUsers.validate_password(data.get('user_password')):
+                raise HTTPException(400, detail="Password must be at least 8 characters long")
+
+            if not LmsUsers.validate_phone_number(data.get('phone_no')):
+                raise HTTPException(400, detail="Invalid Phone number")
+
+            usr = LmsUsers(**data)
+            utc_now = pytz.utc.localize(datetime.utcnow())    # pytz library me utc object hai utc object me lo function hai jisme se hum current data time nikalenege aur phir asia la date and time
+            ist_now = utc_now.astimezone(pytz.timezone('Asia/Kolkata'))
+            usr.created_on = ist_now
+            hashed_password = bcrypt.hashpw(data.get('user_password').encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            usr.user_password = hashed_password
+            db.add(usr)
+            db.commit()
+            response = api_response(200, message="User Created successfully")
+            return response
+        except HTTPException as e:
+            error_message = e.detail
+            return HTTPException(status_code=e.status_code, detail=error_message)
+        except Exception as e:
+            db.rollback()
+            return HTTPException(500, detail=str(e))
+
+@router.post('/lms_login')
+async def lms_login(credential: LoginInput):
+    try:
+        response = user_ops.lms_login(credential)
+        return response
+    except HTTPException as e:
+        raise
+    except Exception as e:
+        return HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/insert/lms_user")
+async def lms_register(data: UserCreate, db: Session = Depends(get_db)):
+    return user_ops.lms_register(data.model_dump(), db)
+#######################################################################################################################################################
+
+                                        images , pdf , text file uplaod  with unique name on server and serve on frontend
+########################################################################################################################################################
+### code ###
+
+dimport os
+import shutil
+import uuid
+from typing import Optional
+from fastapi import UploadFile, HTTPException
+
+def save_upload_file(upload_file: Optional[UploadFile]) -> Optional[str]:
+    if not upload_file:
+        return None
+    
+    try:
+        # Generate a unique filename
+        unique_filename = str(uuid.uuid4()) + "_" + upload_file.filename
+        # Define the full path to save the file
+        file_path = os.path.join("static", "uploads", unique_filename)   #ouput // static/uploads/file.txt   this file store temporary on server
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)   # check file path exist or not by using os module 
+
+        # Open the target file in binary write mode and save the uploaded file
+        with open(file_path, "wb") as buffer:  #// open new file for copy original file which are are store temporary on serve
+
+            shutil.copyfileobj(upload_file.file, buffer)    # by using shell utility(shutil) copy temporary file in parmanent 
+        
+        # Convert backslashes to forward slashes for cross-platform compatibility
+        file_path = file_path.replace("\\", "/")
+        return file_path
+    
+    except Exception as e:
+        # Raise an HTTP 500 error with the error message if something goes wrong
+        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+
+### we need  to do static file mount in main file for serverd video, images and css or html file 
+app.mount("/static", StaticFiles(directory="static"), name="static")  # this code we have to put in main file where code start for execution
+
+#############################################################################################################################################################
+
+                                                # Email sending  ###   using smtplib library and send_email function
+###########################################################################################################################################################
+
+#### These lines import necessary modules:###
+
+pytz for working with timezones
+smtplib for sending emails
+email.mime modules for creating email messages
+load_dotenv for loading environment variables
+bcrypt for password hashing
+pydantic for data validation
+fastapi components for building API endpoints
+#################
+import pytz
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from dotenv import load_dotenv
+import bcrypt
+from pydantic import EmailStr, BaseModel
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+
+### This defines an asynchronous function send_email that takes three parameters: subject, recipient email, and email body.
+async def send_email(subject, email_to, body):
+    # Set up the SMTP server
+    smtp_server = 'smtp.gmail.com'  
+    smtp_port = 587                               #####These lines set up SMTP server details for Gmail, including the server address, port, username, and password.
+    smtp_username = 'vinaykumar900417@gmail.com'  
+    smtp_password = 'fgyc cjhy lfmb fddk' ## for generating this we need to go gmail account than click on Manage your Google Account after  that click on security  click on 2 steps veification after verify in search bar  App Passwords tahn write any thing than genareate
+    try:                                  ##Go back to your Google Account settings (https://myaccount.google.com/).In the navigation panel, select "Security".Under "Signing in to Google," select "App Passwords" (you may need to sign in again).
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)  ##This block attempts to connect to the SMTP server, start TLS for secure communication, and log in using the provided credentials.
+        server.starttls()  
+        server.login(smtp_username, smtp_password)  
+        
+        msg = MIMEMultipart()     ### These lines create a multipart email message, set the sender, recipient, subject, and attach the HTML body.
+        msg['From'] = smtp_username
+        msg['To'] = email_to
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
+
+        server.sendmail(smtp_username, email_to, msg.as_string())   ### This sends the email and closes the SMTP server connection.
+        server.quit()
+
+    except Exception as e:
+        
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+################################################
+@staticmethod
+def validate_password(password):
+        return len(password) >= 8
+
+
+@router.put("/change_password/{user_id}")
+async def change_password(current_password: str, new_password: str, confirm_new_password: str, current_user: LmsUsers = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        if new_password != confirm_new_password:
+            raise HTTPException(status_code=400, detail="New passwords do not match")
+
+        user = db.query(LmsUsers).filter(LmsUsers.user_id == current_user.user_id, LmsUsers.is_deleted == False).first()
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User with ID {current_user.user_id} not found")
+
+        if not bcrypt.checkpw(current_password.encode('utf-8'), user.user_password.encode('utf-8')):
+            raise HTTPException(status_code=400, detail="Wrong current password")
+
+        if not user_ops.validate_password(new_password):
+            raise HTTPException(status_code=400, detail="Invalid new password")
+        
+        hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        user.user_password = hashed_new_password
+
+        db.commit()
+        contact = "900-417-3181"
+        email_contact = "vinay@example.com"
+
+        reset_email_body = f"""
+        <p>Dear User,</p>
+        <p>Your password has been successfully changed.</p>
+        <p>If you did not request this change, please contact support at {contact} or email us at {email_contact}.</p>
+        <p>Thank you!</p>
+        <br><br>
+        <p>Best regards,</p>
+        <p>Vinay Kumar</p>
+        <p>MaitriAI</p>
+        <p>900417181</p>
+        """
+        await send_email(
+            subject="Password Change Confirmation",
+            email_to=user.user_email,
+            body=reset_email_body
+        )
+        return {"message": "Password changed successfully"}
+
+    except HTTPException as e:
+        raise e
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+
+@router.put("/reset_password")
+async def forgot_password(email: str, new_password: str, confirm_new_password: str, db: Session = Depends(get_db)):
+    try:
+        if new_password != confirm_new_password:
+            raise HTTPException(status_code=400, detail="Passwords do not match")
+
+        user = db.query(LmsUsers).filter(LmsUsers.user_email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User with email {email} not found")
+        
+        if not validate_password(new_password):
+            raise HTTPException(status_code=400, detail="Invalid new password")
+
+        hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        user.user_password = hashed_new_password
+
+        db.commit()
+
+        # Send email for password reset
+        contact = "900-417-3181"
+        email_contact = "vinay@example.com"
+
+        reset_email_body = f"""
+        <p>Dear User,</p>
+        <p>Your password has been successfully changed.</p>
+        <p>If you did not request this change, please contact support at {contact} or email us at {email_contact}.</p>
+        <p>Thank you!</p>
+        <br><br>
+        <p>Best regards,</p>
+        <p>Vinay Kumar</p>
+        <p>MaitriAI</p>
+        <p>900417181</p>
+        """
+        await send_email(
+            subject="Password Reset Request",
+            email_to=email,
+            body=reset_email_body
+        )
+
+        return {"message": "Password reset successfully"}
+
+    except HTTPException as e:
+        raise e
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+#### Scheema ####
+class EmailSchema(BaseModel): ##This defines a Pydantic model for validating email data. It ensures email_to is a valid email address, and subject and body are strings.
+    email_to: EmailStr
+    subject: str
+    body: str
+
+@app.post("/send-email/")
+async def send_email_endpoint(email: EmailSchema):
+    try:
+        await send_email(email.subject, email.email_to, email.body)  ##This is the asynchronous function that handles the actual email sending process.
+        return {"message": "Email sent successfully"}                   ##Calls the send_email function with the provided details. where set all thing for sending email like port, serever, password
+    except HTTPException as e:                      
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+##################################################################################################################################
+
+                                Scarap google map reviews and feedback data by using apify 
+#####################################################################################################################################
+
+These lines import necessary modules:
+
+FastAPI components for building the API
+httpx for making asynchronous HTTP requests
+os for accessing environment variables
+typing for type hinting
+Pydantic for data validation and settings management
+####################################
+
+from fastapi import FastAPI, HTTPException, APIRouter
+import httpx
+import os
+from typing import List, Optional
+from pydantic import BaseModel
+#####################
+This defines a Pydantic model for a Review, with fields for author name, rating, text, and time. The Optional fields have default values.
+###############
+class Review(BaseModel):
+    name: Optional[str] = "Unknown"
+    text: Optional[str] = ""
+    stars: Optional[float] = 0.0  # Added stars field
+    reviewsCount: Optional[float] = 0.0 
+    
+
+router = APIRouter() ####This creates an APIRouter instance, which allows you to organize routes in FastAPI.
+
+APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_0f3ijHG3nSUNDpBYbAec6BrCAA1SBA3siQFr") ##These lines get the Apify token and dataset ID from environment variables, with fallback values if not set.
+DATASET_ID = os.getenv("DATASET_ID", "iyTVHiSAvash8upSR")  # for token and  dataset id we have to go for apify first we need to go apify login after that click on apify store and than click on 
+                                                            install google map scaraper  after than go on actors paste url link which u want to scrap data of google map after go on storage there u got dataset ID
+                                                            for apify token  yo just go on Apify profile click on api than u got token
+
+@router.get("/reviews/", response_model=List[Review])  #This defines an asynchronous GET endpoint at "/reviews/" that returns a list of Review objects.
+async def get_google_map_reviews():
+    url = f"https://api.apify.com/v2/datasets/{DATASET_ID}/items?token={APIFY_TOKEN}&format=json"  #This constructs the URL for the Apify API request.
+
+    async with httpx.AsyncClient() as client:          #This creates an asynchronous HTTP client and sends a GET request to the Apify API.
+        response = await client.get(url)
+        if response.status_code == 200:
+            data = response.json()    ## If the request is successful:Parse the JSON responseCreate a list of Review objects from the dataFor each item, create a Review object, using default values if data is missingReturn the list of reviews
+            reviews = []
+                for item in data:
+                    # Extract stars directly if it's available in the API response
+                    stars = item.get("stars", 0.0)  # Adjust the field name based on your API response
+
+                    reviews.append(Review(
+                        name=item.get("name", "Unknown"),
+                        text=item.get("text", ""),
+                        time=item.get("time", ""),
+                        stars=stars,  # Include stars in Review
+                        reviewsCount=item.get("reviewsCount", 0.0)
+                    ))
+                return reviews
+            except (KeyError, ValueError) as e:
+                raise HTTPException(status_code=500, detail=f"Failed to parse data from Apify: {str(e)}")
+        else:
+            raise HTTPException(status_code=500, detail="Failed to fetch data from Apify")
+
+    
+ ***************************** git all command **************
+
+ …or create a new repository on the command line
+echo "# OCR_using_easyocr_lib" >> README.md
+
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+git push -u origin main
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+git branch -M main
+git push -u origin main
+
+git remote remove origin
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+
+Create and switch to the new branch:
+git checkout -b new_branch_name
+
+Verify that you are on the new branch:
+git branch
+
+switch to a branch
+git checkout branch_name
+
+ ***************************** SQL all command **************
+ create naw database
+ CREATE DATABASE database_name;
+ USE database_name;
+
+ create table
+ CREATE TABLE employees (
+    employee_id INT AUTO_INCREMENT,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    hire_date DATE,
+    salary DECIMAL(10, 2),
+    PRIMARY KEY (employee_id)
+);
+
+ for add new Column in table
+ ALTER TABLE table_name ADD COLUMN new_column_name VARCHAR(233);
+
+delete all table data
+TRUNCATE TABLE table_name;
+
+Delete particular data
+DELETE FROM parent_information WHERE parent_id = <parent_id>;
+
+Delete a column:
+ALTER TABLE parent_information 
+
+delete table
+DROP TABLE table_name;
