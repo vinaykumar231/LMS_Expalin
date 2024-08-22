@@ -1,0 +1,8 @@
+
+Error : OSError: [WinError 126] The specified module could not be found. Error loading "C:\Users\Mukesh\anaconda3\envs\yard\lib\site-packages\torch\lib\fbgemm.dll" or 
+        one of its dependencies.
+solution : conda install pytorch torchvision cpuonly -c pytorch
+
+
+
+https://github.com/raj036/LMS

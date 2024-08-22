@@ -1,0 +1,248 @@
+Your current code is designed to fetch and process attendance data from a biometric device API and store it in a database. If you want to fetch data from other APIs, like GitHub or Google Maps, the approach is conceptually similar but requires adjusting for the specific API endpoints, request methods, and data formats of those services.
+
+Here’s how you can adapt the general approach for two different types of APIs: GitHub and Google Maps.
+
+Fetching Data from GitHub API
+To fetch data from the GitHub API, you’ll typically work with endpoints such as retrieving user repositories or issues.
+##############################################################################################################################
+                                #github map reviews
+##############################################################################################################################
+
+Example: Fetching User Repositories from GitHub
+python
+Copy code
+import httpx
+from fastapi import APIRouter, HTTPException
+from typing import List
+from . import models, database
+
+router = APIRouter()
+
+GITHUB_API_URL = 'https://api.github.com/users/{username}/repos'
+
+@router.get("/github/repos/{username}", response_model=List[dict])
+async def get_github_repositories(username: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = GITHUB_API_URL.format(username=username)
+            response = await client.get(url)
+            response.raise_for_status()
+            repos_data = response.json()
+
+        # Process the raw data if needed
+        return repos_data
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+Explanation
+GitHub API Endpoint:
+
+The URL pattern https://api.github.com/users/{username}/repos is used to fetch repositories for a specific GitHub user.
+Replace {username} with the actual GitHub username.
+Processing Data:
+##############################################################################################################################
+                                googgle map reviews
+##############################################################################################################################
+
+For GitHub, data is returned as a list of dictionaries. If you need specific processing or filtering, you can add that logic in the try block.
+Fetching Data from Google Maps API
+To fetch reviews from the Google Maps API, you'll need to use the Google Places API, which requires an API key.
+
+Example: Fetching Place Details including Reviews
+python
+Copy code
+import httpx
+from fastapi import APIRouter, HTTPException
+from typing import List
+from pydantic import BaseModel
+
+router = APIRouter()
+
+GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api/place/details/json'
+
+class Review(BaseModel):
+    author_name: str
+    rating: float
+    text: str
+
+@router.get("/maps/reviews/{place_id}", response_model=List[Review])
+async def get_place_reviews(place_id: str, api_key: str):
+    try:
+        params = {
+            'place_id': place_id,
+            'fields': 'reviews',
+            'key': api_key
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(GOOGLE_MAPS_API_URL, params=params)
+            response.raise_for_status()
+            place_data = response.json()
+            reviews = place_data.get('result', {}).get('reviews', [])
+
+        # Process the raw data into Review objects
+        reviews_list = [
+            Review(
+                author_name=review.get('author_name'),
+                rating=review.get('rating'),
+                text=review.get('text')
+            )
+            for review in reviews
+        ]
+
+        return reviews_list
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+Explanation
+Google Maps API Endpoint:
+
+The URL https://maps.googleapis.com/maps/api/place/details/json is used to fetch place details including reviews.
+Requires a place_id and an API key.
+Processing Data:
+
+The response includes reviews data which is converted into Review model objects for easier handling.
+API Key Management:
+
+Ensure to keep your API key secure. It should be stored securely and not hardcoded in your source code.
+Common Adjustments for Different APIs
+Authentication: Some APIs (like GitHub and Google Maps) require authentication via tokens or API keys.
+Data Structure: Adapt your data processing based on the structure of the response from each API.
+Error Handling: Handle specific errors based on the API’s response and error codes.
+Feel free to adapt these examples based on your needs and the specific APIs you're working with.
+
+##############################################################################################################################
+                                biomatrics
+##############################################################################################################################
+
+To complete your FastAPI endpoint to fetch attendance data from the biometric device using the provided API_URL, you'll need to make an HTTP request to the API, handle the response, and process the data into your Attendance model. Here’s how you can do this using httpx for making asynchronous HTTP requests.
+
+Full Example
+Install Dependencies: Ensure you have httpx installed if you haven't already.
+
+bash
+Copy code
+pip install httpx
+Update the FastAPI Endpoint: Modify your FastAPI endpoint to fetch data from the given API URL.
+
+python
+Copy code
+from fastapi import APIRouter, HTTPException
+from typing import List
+from datetime import date
+import httpx
+from . import models, database
+
+router = APIRouter()
+
+# Dependency to get the database session
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+API_URL = 'http://ebioservernew.esslsecurity.com:99/webservice.asmx?op=GetEmployeeDetails'
+
+@router.get("/attendances/biometrics", response_model=List[models.Attendance])
+async def get_attendance(start_date: date, end_date: date, db: Session = Depends(get_db)):
+    try:
+        async with httpx.AsyncClient() as client:
+            # Construct the request parameters
+            params = {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat()
+            }
+            
+            # Fetch attendance data from the biometric device
+            response = await client.get(API_URL, params=params)
+            response.raise_for_status()
+            attendance_data = response.json()
+
+        # Process the raw data into Attendance objects
+        attendance_records = []
+        for record in attendance_data:
+            attendance_record = models.Attendance(
+                user_id=record['user_id'],
+                date=record['date'],
+                time=record['time'],
+                status=record['status']
+            )
+            # Optionally, add record to the database
+            db.add(attendance_record)
+            attendance_records.append(attendance_record)
+
+        # Commit all records to the database
+        db.commit()
+
+        return attendance_records
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+Explanation
+httpx.AsyncClient:
+
+Used for making asynchronous HTTP requests to the API endpoint.
+The AsyncClient allows you to make non-blocking HTTP requests.
+Request Parameters:
+
+Parameters like start_date and end_date are passed as query parameters. You need to adjust this based on how the API expects parameters.
+Response Handling:
+
+response.raise_for_status() ensures that any HTTP error (e.g., 404 or 500) raises an exception.
+response.json() parses the JSON response from the API.
+Processing Data:
+
+Converts each record from the API response into an Attendance object.
+Optionally adds each Attendance object to the database and commits all records.
+Error Handling:
+
+Catches exceptions and raises a 500 HTTP error with details if something goes wrong.
+Notes
+API URL: Make sure the API URL and parameters match the actual API documentation. If the API uses a different method to send parameters (e.g., POST request), adjust the code accordingly.
+Data Format: Ensure the structure of attendance_data from the API response matches the fields used in your Attendance model. Adjust the field mappings if necessary.
+Pagination: If the API supports pagination and you need to handle it, you’ll need to implement a loop to fetch data from multiple pages, similar to the previous example.
+
+                                    or
+
+DEVICE_IP = "192.168.168.100"
+DEVICE_PORT = 5005
+
+class BiometricRecord(BaseModel):
+    user_id: int
+    timestamp: str
+    biometric_data: str
+
+def get_biometric_data():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((DEVICE_IP, DEVICE_PORT))
+            sock.sendall(b"GET_BIOMETRIC_DATA\n")
+            
+            data = sock.recv(4096).decode()
+            
+            biometric_records = []
+            for line in data.split('\n'):
+                if line.strip():
+                    user_id, timestamp, biometric_data = line.split(',')
+                    record = BiometricRecord(
+                        user_id=int(user_id),
+                        timestamp=timestamp,
+                        biometric_data=biometric_data
+                    )
+                    biometric_records.append(record)
+            
+            return biometric_records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve biometric data: {str(e)}")
+
+@router.get("/biometrics/all")
+async def get_biometrics():
+    return get_biometric_data()
+
+
+
+
+
+

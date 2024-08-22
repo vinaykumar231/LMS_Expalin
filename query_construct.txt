@@ -1,0 +1,335 @@
+Certainly! I'll provide a comprehensive list of key SQLAlchemy functions and keywords used for querying and manipulating data in Python. These are commonly used with the SQLAlchemy ORM (Object Relational Mapper).
+
+Query Construction:
+
+query(): Starts a query
+select(): Constructs a SELECT statement (SQLAlchemy 2.0+)
+filter(): Applies WHERE clauses
+filter_by(): Applies WHERE clauses with keyword arguments
+order_by(): Orders results
+group_by(): Groups results
+having(): Applies HAVING clause after GROUP BY
+limit(): Limits number of results
+offset(): Skips a number of results
+distinct(): Removes duplicate rows
+
+
+Joins:
+
+join(): Performs an inner join
+outerjoin(): Performs a left outer join
+joinedload(): Eagerly loads related objects
+subqueryload(): Loads related objects using a subquery
+selectinload(): Loads related objects using SELECT IN
+lazyload(): Loads related objects lazily (default behavior)
+
+
+Aggregations and Functions:
+
+func: Namespace for SQL functions (e.g., func.count(), func.sum(), func.avg())
+label(): Gives an expression a name
+case(): Constructs a CASE statement
+
+
+Logical Operators:
+
+and_(): Combines conditions with AND
+or_(): Combines conditions with OR
+not_(): Negates a condition
+
+
+Comparison Operators:
+
+==, !=, <, >, <=, >=: Standard comparisons
+in_(): Checks if a value is in a list
+between(): Checks if a value is between two others
+like(): Pattern matching with LIKE
+ilike(): Case-insensitive LIKE
+
+
+Subqueries:
+
+subquery(): Creates a subquery
+alias(): Creates an alias for a table or subquery
+
+
+Set Operations:
+
+union(): Combines results of two queries
+union_all(): Combines results without removing duplicates
+intersect(): Returns common results between queries
+except_(): Returns results in first query but not in second
+
+
+Data Manipulation:
+
+insert(): Inserts new records
+update(): Updates existing records
+delete(): Deletes records
+
+
+Result Retrieval:
+
+all(): Returns all results as a list
+first(): Returns the first result
+one(): Returns exactly one result (raises an error if not exactly one)
+scalar(): Returns a single scalar value
+count(): Returns the count of results
+
+
+Relationship Loading:
+
+with_parent(): Queries for objects related to a specific parent
+contains_eager(): Specifies how to load a related object
+
+
+Raw SQL:
+
+text(): Allows writing raw SQL strings
+bindparam(): Creates a bound parameter in raw SQL
+
+
+Session Operations:
+
+add(): Adds an object to the session
+add_all(): Adds multiple objects to the session
+delete(): Marks an object for deletion
+commit(): Commits the current transaction
+rollback(): Rolls back the current transaction
+flush(): Flushes all pending changes to the database
+
+################## difference between join and joinedload #####################################
+
+### join is basically use for amemory effecency means when we search apecific data than not need searchh all adatabase table we ony search sepecifi table and search ir lik this ##
+course_content = db.query(Course_content).join(
+        Course,
+        Course.id == Course_content.course_id
+    ).join(
+        TeacherCourse,
+        and_(
+            TeacherCourse.course_id == Course.id,
+            TeacherCourse.is_assign_course == True
+        )
+    ).filter(Course_content.id == course_content_id).first()
+in above exaple we want insert in upload data based on conteend _id but content_id avilable in three table that's we need to search content id in 3 three for serach we need to use join
+
+### joinload is bassically used for connect all three table to eache other than we can aaces data from all 3 three table by using on object  ##
+course = db.query(Course).options(
+        joinedload(Course.standards)
+        .joinedload(Standard.subject)  # Changed from 'subject' to 'subjects'
+        .joinedload(Subject.modules)
+    ).filter(Course.id == course_id).first()
+
+in above example  course is a object by using tah we cann acess all data which are availabe in all table which are joined
+
+####################### difference between generator function and normal function ###############################
+
+Let me explain the difference between normal functions and generators in Python using simple terms:
+Normal Function:
+A normal function is like a chef who prepares a whole meal at once. When you call the function, it does all its work, gives you the final result, and then it's done.
+def square_numbers(n):
+    result = []
+    for i in range(1, n+1):
+        result.append(i**2)
+    return result
+
+# Using the normal function
+squares = square_numbers(5)
+print(squares)  # Output: [1, 4, 9, 16, 25]
+
+Generator:
+A generator is like a chef who prepares your meal in courses. Each time you ask for the next course (using next()), the chef gives you just that part of the meal. 
+The chef remembers where they left off and continues from there the next time you ask.
+
+######### Example #################
+@router.get("/course_contents/{content_id}", response_model=None, dependencies=[Depends(JWTBearer()), Depends(get_admin_or_teacher)])
+def get_course_content_by_id(content_id: int, db: Session = Depends(get_db)):
+    try:
+        # Query for course content details
+        course_content = db.query(Course_content).filter(Course_content.id == content_id).first()
+        
+        if not course_content:
+            raise HTTPException(status_code=404, detail="Course content not found")
+
+        # Query for related contents with their lessons
+        contents_query = db.query(Content).filter(
+            Content.course_content_id == content_id
+        ).options(joinedload(Content.lesson))
+
+        contents = contents_query.all()
+
+        if not contents:
+            raise HTTPException(status_code=404, detail="No content found for this course content.")
+
+        result = {
+            "id": course_content.id,
+            "course_name": course_content.course.name,
+            "subject_name": course_content.subject.name,
+            "standard_name": course_content.standard.name,
+            "module_name": course_content.module.name,
+            "is_active": course_content.is_active,
+            "lessons": []
+        }
+
+        for content in contents:
+            lesson_data = {
+                "lesson_id": content.lesson.lesson_id,
+                "title": content.lesson.title,
+                #"description": content.lesson.description,
+                "content_info": {
+                    "id": content.id,
+                    #"name": content.name,
+                    "description": content.content_description,
+                    #"content_type": content.content_type,
+                    "content_path": [f"{base_url_path}/{path}" for path in content.content_path] if content.content_path else None
+                }
+            }
+            
+            # Check if the lesson is already in the result
+            existing_lesson = next((l for l in result["lessons"] if l["lesson_id"] == lesson_data["lesson_id"]), None) // check lession_id in  main container  'result' and temperory conatiner 'lesson_data' 
+            if existing_lesson:
+                existing_lesson["content_info"].append(lesson_data["content_info"])   //agar main conatiner means result me lesson hai to only content upadate ho lesson id whi rahega
+            else:
+                lesson_data["content_info"] = [lesson_data["content_info"]] // agar lessson main conatiner me nhi ahi to new leeson uska content main conatiner me dal do
+                result["lessons"].append(lesson_data)
+
+        return result
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve course content: {str(e)}")
+
+##### example 2 ######
+def generator_content(db: Session, course_content_id: int, current_user: LmsUsers = Depends(get_current_user)):
+    contents = db.query(Content).filter(Content.course_content_id == course_content_id).options(joinedload(Content.lesson)).all()
+    lessons = []
+
+    for content in contents:
+        lesson_id = content.lesson.lesson_id
+        lesson_title = content.lesson.title
+        content_info = {
+            "content_id": content.id,
+            "content_description": content.content_description,
+            "content_path": [f"{base_url_path}/{path}" for path in content.content_path] if content.content_path else []
+        }
+
+        # Find existing lesson in the list
+        lesson = next((l for l in lessons if l["lesson_id"] == lesson_id), None)
+        if lesson is None:
+            # If lesson doesn't exist, create it
+            lesson = {
+                "lesson_id": lesson_id,
+                "lesson_title": lesson_title,
+                "contents": []
+            }
+            lessons.append(lesson)
+        
+        if current_user.user_type in ["admin", "teacher"]:
+            lesson["contents"].append(content_info)
+
+    return lessons
+
+@router.get("/content/")
+async def get_content_and_lesson(course_content_id: int, db: Session = Depends(get_db)):
+    course_content = db.query(Course_content).filter(Course_content.id == course_content_id).first()
+    if not course_content:
+        raise HTTPException(status_code=404, detail="Course content not found")
+
+    lessons = generator_content(db, course_content_id)
+    return lessons
+
+
+##############################################################################################
+
+label =  it is use for temporary name in database ahs original name but by sing label we can set any name
+skip=start= means strat 0 when we need question 1 to to 10 than we have to skip and limit
+limit =
+
+##########  example:- #######
+@router.get("/Discount_questions/question_paper_test/", response_model=List[QuestionPaperResponse])
+async def get_question_paper(
+    standard_id: int,
+    subject_id: int,
+    start: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    # Query to get questions with subject and standard information
+    questions = db.query(DiscountQuestion, Subject.name.label('subject_name'), Standard.name.label('standard_name'))\
+        .join(Subject, DiscountQuestion.subject_id == Subject.id)\
+        .join(Standard, DiscountQuestion.standard_id == Standard.id)\
+        .filter(DiscountQuestion.standard_id == standard_id,
+                DiscountQuestion.subject_id == subject_id)\
+        .offset(start).limit(limit).all()
+    
+    if not questions:
+        raise HTTPException(status_code=404, detail="No questions found for the given standard and subject")
+    
+    # Prepare the response
+    result = []
+    for question, subject_name, standard_name in questions:
+        result.append(QuestionPaperResponse(
+            subject_id=question.subject_id,
+            subject_name=subject_name,
+            standard_id=question.standard_id,
+            standard_name=standard_name,
+            option1_text=question.option1_text,
+            option2_text=question.option2_text,
+            option3_text=question.option3_text,
+            option4_text=question.option4_text,
+            correct_ans_text=question.correct_ans_text,
+            question_id=question.question_id,
+            question_text=question.question_text,
+            difficulty_level=question.difficulty_level
+        ))
+    
+    return result
+#####################################################################################
+distinct= by using that we can get unique data only from databse
+
+@router.get("/courses/unique", response_model=None)
+def read_all_courses(db: Session = Depends(get_db)):
+    try:
+        # Query distinct course names
+        unique_course_names = db.query(Course.name).distinct().all()
+        # Convert to a list
+        unique_names = [name[0] for name in unique_course_names]
+        return {"unique_courses": unique_names}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch courses")
+
+###############################################################################################
+select ; by use thta we select perticular field of table 
+
+query = select(Fee.amount).filter(
+            Fee.course_id == course_id,
+            Fee.standard_id == standard_id,
+            Fee.year == year,
+            Fee.subject_id == subject_id,
+            Fee.module_id == module_id,
+            Fee.batch_id == batch_id
+        )
+        result = db.execute(query).fetchone()
+        if result:
+            return {"amount":result[0]}
+
+############################## subquery example ##################################
+
+subquery = (
+            db.query(
+                Payment.user_id,
+                func.max(Payment.created_on).label("latest_payment_date")
+            )
+            .group_by(Payment.user_id)
+            .subquery()
+        )
+
+        # Main query to get the details of the latest payments
+        payments = (
+            db.query(Payment)
+            .join(subquery, (Payment.user_id == subquery.c.user_id) & (Payment.created_on == subquery.c.latest_payment_date))
+            .order_by(desc(Payment.created_on))
+            .all()
+        )
+        

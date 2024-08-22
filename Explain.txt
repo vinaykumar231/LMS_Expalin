@@ -1,8 +1,9 @@
+from decouple import config  #pip install python-decouple
+from jwt import PyJWTError  #pip install PyJWT
 #######################################################################################################################################################
                                                      for DataBase connection with Mysql
 #######################################################################################################################################################
-
-                            
+                          
 step 1 install:-  pip install pymysql and pip install mysql-connector-python
 step 2 :- write code
 
@@ -60,6 +61,57 @@ def get_db():
         yield db
     finally:
         db.close()
+
+#######################################################################################################################################################
+
+                                        retrieve data from socket 
+#######################################################################################################################################################
+DEVICE_IP = "192.168.168.100" 
+DEVICE_PORT = 5005
+##DEVICE_IP is like the office building’s security system’s address on the network.
+DEVICE_PORT is the specific “door” or “line” through which you’ll communicate with the security system.
+
+class BiometricRecord(BaseModel):
+    user_id: int
+    timestamp: str
+    biometric_data: str
+
+def get_biometric_data():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:   ##Think of socket.socket(socket.AF_INET, socket.SOCK_STREAM) as opening a telephone line to 
+                                                                          communicate with another office. The with keyword is like making sure you hang up the phone properly 
+                                                                           once you’re done.
+                                                                           AF_INET stands for "Address Family - Internet Protocol version 4". It indicates that you are using IPv4 addresses.
+                                                                            IPv4 is the most common version of the Internet Protocol used for addressing and routing packets of data on the internet.
+                                                                            SOCK_STREAM specifies that the socket will use TCP. TCP is a protocol that provides reliable, ordered, and error-checked delivery of a stream of bytes.
+                                                                            With TCP, a connection is established between the sender and receiver before data is transmitted. This connection ensures that data arrives in the correct order and is complete.
+            sock.connect((DEVICE_IP, DEVICE_PORT))
+            sock.sendall(b"GET_BIOMETRIC_DATA\n")
+            
+            data = sock.recv(4096).decode()
+            4096: This is the maximum number of bytes you want to read from the socket at one time. It’s often chosen based on the expected size of the incoming data. 
+            You can adjust this size depending on the expected size of the data or the application’s requirements.
+            The .decode() method converts the byte data into a string. If the data received was binary or encoded text, it’s now converted into a human-readable format.
+            
+            biometric_records = []
+            for line in data.split('\n'):
+                if line.strip():
+                    user_id, timestamp, biometric_data = line.split(',')
+                    record = BiometricRecord(
+                        user_id=int(user_id),
+                        timestamp=timestamp,
+                        biometric_data=biometric_data
+                    )
+                    biometric_records.append(record)
+            
+            return biometric_records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve biometric data: {str(e)}")
+
+@router.get("/biometrics/all")
+async def get_biometrics():
+    return get_biometric_data()
+
 #######################################################################################################################################################
 
                                         for User and admin login or register new user
@@ -734,6 +786,10 @@ git branch
 
 switch to a branch
 git checkout branch_name
+
+show origin
+git remote show origin
+git remote -v
 
  ***************************** SQL all command **************
  create naw database
