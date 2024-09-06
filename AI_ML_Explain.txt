@@ -1,0 +1,478 @@
+Using Deepface library login
+
+in this direct during regitration direct emding code means vector code do image path than derct vrfiy using DeepFace.verify function
+
+# Configuration for DeepFace
+MODEL_NAME = "Facenet512"
+BACKEND = "ssd"  # Use the detector backend you prefer
+
+TEMP_DIRECTORY = "static/uploads/temp"
+TEMP_DIRECTORY1 = "static/Driver_info_images"  # Directory for saving driver images
+
+# Function to save uploaded files
+def save_uploaded_file(file: UploadFile, directory: str) -> str:
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    file_path = os.path.join(directory, unique_filename)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return file_path
+
+# Function to calculate Euclidean distance
+def find_euclidean_distance(source_representation, test_representation):
+    """
+    Calculate the Euclidean distance between two vectors (embeddings).
+    
+    Args:
+        source_representation (list or np.array): The source embedding.
+        test_representation (list or np.array): The test embedding.
+    
+    Returns:
+        float: The Euclidean distance between the two embeddings.
+    """
+    source_array = np.array(source_representation)
+    test_array = np.array(test_representation)
+    return np.linalg.norm(source_array - test_array)
+
+def generate_otp():
+    return random.randint(1000, 9999)
+
+# Register a new AI surveillance user
+@router.post("/register/AI_surveillance_user/")
+async def register_user(
+    user_name: str = Form(...),
+    user_email: str = Form(...),
+    user_password: str = Form(...),
+    user_type: UserType = Form(UserType.user),
+    phone_no: str = Form(...),
+    driver_address: str = Form(...),
+    driver_images: UploadFile = File(...),
+    driver_license: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        image_path = save_uploaded_file(driver_images, TEMP_DIRECTORY1)
+        driver_license_number1 = await process_image(driver_license, "number_plate")
+        driver_license_number = clean_string(driver_license_number1)
+        driver_license_path = save_uploaded_file(driver_license, TEMP_DIRECTORY1)
+        hashed_password = bcrypt.hashpw(user_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Generate face embeddings for the driver image
+        embedding = DeepFace.represent(img_path=image_path, model_name=MODEL_NAME, detector_backend=BACKEND)[0]["embedding"]
+        assigned_key = generate_otp()
+        new_user = Surveillance_User(
+            user_name=user_name, 
+            driver_images=image_path,
+            user_email=user_email,
+            user_password=hashed_password,
+            user_type=user_type,
+            phone_no=phone_no,
+            driver_address=driver_address,
+            driver_license=driver_license_path,
+            assigned_keys=assigned_key,
+            embeddings=json.dumps(embedding)  # Serialize embeddings to JSON
+        )
+        db.add(new_user)
+        db.flush()
+
+        driver_license_db = License_info(
+            user_id=new_user.user_id,
+            license_number=driver_license_number
+        )
+        db.add(driver_license_db)
+        db.commit()
+        db.refresh(driver_license_db)
+        
+        return {"message": "User registered successfully", "username": user_name}
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+# Function to set up a temporary directory
+def setup_temp_directory():
+    os.makedirs(TEMP_DIRECTORY, exist_ok=True)
+
+# Function to clean up a temporary directory
+def cleanup_temp_directory():
+    if os.path.exists(TEMP_DIRECTORY):
+        shutil.rmtree(TEMP_DIRECTORY)
+    setup_temp_directory()
+
+# Function to log image details
+def log_image_details(img_path: str):
+    try:
+        with Image.open(img_path) as img:
+            print(f"Image format: {img.format}")
+            print(f"Image size: {img.size}")
+    except Exception as e:
+        print(f"Error logging image details: {str(e)}")
+
+# Identify user by comparing face embeddings
+def identify_user(img_path: str, db: Session) -> Dict[str, Any]:
+    try:
+        # Generate the embedding for the uploaded image
+        embedding_to_verify = DeepFace.represent(img_path=img_path, model_name=MODEL_NAME, detector_backend=BACKEND)[0]["embedding"]
+        
+
+        # Query all users from the database
+        users = db.query(Surveillance_User).all()
+        
+        # Iterate through each user and compare embeddings
+        for user in users:
+            stored_embedding = json.loads(user.embeddings)  # Deserialize embeddings from JSON
+            distance = find_euclidean_distance(stored_embedding, embedding_to_verify)
+            print(f"Comparing with user {user.user_name}: distance = {distance}")
+
+            if distance < 15:  # Adjust this threshold as needed
+                return {"message": "Login successful", "user": user}
+
+        # Raise 404 error if no match is found
+        raise HTTPException(status_code=404, detail="No matching face found")
+    
+    except Exception as e:
+        print(f"Error identifying user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    finally:
+        cleanup_temp_directory()
+
+
+
+# Default dimensions for resizing
+DEFAULT_WIDTH = 738
+DEFAULT_HEIGHT = 991
+DEFAULT_BRIGHTNESS = 1.0  # Default brightness (1.0 = no change)
+DEFAULT_EXT = ".jpg"  # Default file extension
+import logging
+def preprocess_image(image_path: str) -> str:
+    """Resize the image and adjust lighting before identification, saving with a default extension."""
+    with Image.open(image_path) as img:
+        # Resize the image to the default dimensions
+        img = img.resize((DEFAULT_WIDTH, DEFAULT_HEIGHT))
+
+        # Adjust the lighting (brightness)
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(DEFAULT_BRIGHTNESS)
+
+        # Prepare the path for the preprocessed image with a default extension
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        preprocessed_image_path = os.path.join(TEMP_DIRECTORY, f"preprocessed_{base_name}{DEFAULT_EXT}")
+
+        # Save the preprocessed image as JPEG
+        img.save(preprocessed_image_path, format='JPEG')
+        
+        logging.info(f"Preprocessed image saved at: {preprocessed_image_path}")
+    
+    return preprocessed_image_path
+
+
+
+# AI Surveillance login route
+@router.post("/AI_surveillance_login/")
+async def login_user(
+    file: Optional[UploadFile] = File(None),
+    user_email: Optional[str] = Form(None),
+    user_password: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    try:
+        if file:
+            setup_temp_directory()
+            uploaded_image_path = save_uploaded_file(file, TEMP_DIRECTORY)
+            print(f"Uploaded image path: {uploaded_image_path}")
+            
+            # Preprocess the image (resize and adjust lighting)
+            preprocessed_image_path = preprocess_image(uploaded_image_path)
+            print(f"Preprocessed image path: {preprocessed_image_path}")
+            # Log image details
+            log_image_details(uploaded_image_path)
+
+            identification_result = identify_user(img_path=uploaded_image_path, db=db)
+            if "error" in identification_result:
+                raise HTTPException(status_code=500, detail=identification_result["error"])
+            
+            user = identification_result.get("user")
+        elif user_email and user_password:
+            user = db.query(Surveillance_User).filter(Surveillance_User.user_email == user_email).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            if not bcrypt.checkpw(user_password.encode('utf-8'), user.user_password.encode('utf-8')):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+        else:
+            raise HTTPException(status_code=400, detail="Please provide either an image or both email and password")
+
+        token, exp = signJWT(user.user_id, user.user_type)
+        Vehicle_number = db.query(Vehicle_info).filter(
+            Vehicle_info.user_id == user.user_id, 
+            
+        ).first()
+        
+        response = {
+            "message": "Login successful",
+            "token": token,
+            "exp": exp,
+            "user_id": user.user_id,
+            "user_name": user.user_name,
+            "email_id": user.user_email,
+            "user_type": user.user_type,
+            "created_on": user.created_on.isoformat(),
+            "phone_no": user.phone_no,
+            "driver_address": user.driver_address,
+            "assigned_keys": user.assigned_keys if user.assigned_keys else None,
+            "Truck_number": Vehicle_number.truck_number if Vehicle_number  else None
+        }
+        
+        return response
+
+    except HTTPException as e:
+        print(f"HTTPException: {str(e)}")
+        raise e
+    except Exception as e:
+        print(f"Exception: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+    finally:
+        cleanup_temp_directory()
+
+#################################################################################################
+# in this first fetch path from databse if path match than get user id from path than emding path than verify
+
+def setup_temp_directory():
+    if not os.path.exists(TEMP_DIRECTORY):
+        os.makedirs(TEMP_DIRECTORY)
+
+def cleanup_temp_directory():
+    if os.path.exists(TEMP_DIRECTORY):
+        shutil.rmtree(TEMP_DIRECTORY)
+    setup_temp_directory()
+
+def save_uploaded_file(file: UploadFile) -> str:
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    file_path = os.path.join(TEMP_DIRECTORY, unique_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return file_path
+
+def identify_user(img_path: str, db: Session) -> Dict[str, Any]:
+    try:
+        users = db.query(Surveillance_User).all()
+        if not users:
+            return {"message": "No users found in the database."}
+
+        user_image_map = {}
+        for user in users:
+            if os.path.exists(user.driver_images):
+                temp_image_path = os.path.join(TEMP_DIRECTORY, f"{uuid.uuid4()}.jpg")
+                shutil.copy(user.driver_images, temp_image_path)
+                user_image_map[temp_image_path] = user.user_id
+
+        df = DeepFace.find(img_path=img_path, db_path=TEMP_DIRECTORY,
+                           model_name=MODEL_NAME, detector_backend=BACKEND,
+                           distance_metric="euclidean_l2", enforce_detection=False)
+        
+        if isinstance(df, list) and df:
+            matched_image_path = df[0]['identity'][0]
+            user_id = user_image_map.get(matched_image_path)
+            
+            if user_id:
+                user = db.query(Surveillance_User).filter(Surveillance_User.user_id == user_id).first()
+                
+                if user:
+                    result = DeepFace.verify(img1_path=img_path, img2_path=matched_image_path,
+                                             model_name=MODEL_NAME, detector_backend=BACKEND,
+                                             enforce_detection=False)
+                    
+                    if result["verified"]:
+                        return {"user": user, "message": "Login successful"}
+                    else:
+                        return {"message": "Login failed. Face verification did not match."}
+                else:
+                    return {"message": "User not found in the database."}
+            else:
+                return {"message": "No matching user found for the recognized face."}
+        else:
+            return {"message": "No matching face found."}
+    
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        cleanup_temp_directory()
+
+@router.post("/AI_surveillance_login/")
+async def login_user(
+    file: Optional[UploadFile] = File(None),
+    user_email: Optional[str] = Form(None),
+    user_password: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    try:
+        if file:
+            setup_temp_directory()
+            uploaded_image_path = save_uploaded_file(file)
+            identification_result = identify_user(img_path=uploaded_image_path, db=db)
+            
+            if "error" in identification_result:
+                raise HTTPException(status_code=500, detail=f"Error during face recognition: {identification_result['error']}")
+            
+            if "user" in identification_result:
+                user = identification_result["user"]
+            else:
+                return identification_result
+        elif user_email and user_password:
+            user = db.query(Surveillance_User).filter(Surveillance_User.user_email == user_email).first()
+            if not user:
+                raise HTTPException(status_code=404, detail=f"Record with Email: {user_email} not found")
+            
+            if user.user_password is None:
+                raise HTTPException(status_code=400, detail="User password is not set")
+
+            if not bcrypt.checkpw(user_password.encode('utf-8'), user.user_password.encode('utf-8')):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+        else:
+            raise HTTPException(status_code=400, detail="Please provide either an image or both email and password")
+
+        token, exp = signJWT(user.user_id, user.user_type)
+        assigned_key = db.query(Key_Asigned).filter(
+            Key_Asigned.user_id == user.user_id, 
+            Key_Asigned.is_assign_course == True
+        ).first()
+        
+        response = {
+            "message": "Login successful",
+            "token": token,
+            "exp": exp,
+            "user_id": user.user_id,
+            "user_name": user.user_name,
+            "email_id": user.user_email,
+            "user_type": user.user_type,
+            "created_on": user.created_on.isoformat(),
+            "phone_no": user.phone_no,
+            "driver_address": user.driver_address,
+            "assigned_keys": assigned_key.vehicle_key if assigned_key else None,
+            "Truck_number": assigned_key.truck_number if assigned_key else None
+        }
+        
+        return response
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+    finally:
+        cleanup_temp_directory()
+
+####################    Using Geni api do OCR #########################
+
+
+def save_upload(upload_file: Optional[UploadFile]) -> Optional[str]:
+    if not upload_file:
+        return None
+    
+    try:
+        unique_filename = f"{uuid.uuid4()}_{upload_file.filename}"
+        file_path = os.path.join("static", "arrival_images", unique_filename)
+        
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(upload_file.file, buffer)
+        
+        return file_path.replace("\\", "/")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+
+# Configure the Google API key
+genai.configure(api_key="AIzaSyBu09u-HqAT7z0_ztXu5gxjNnGA7I1oQDY")
+
+CUSTOM_PROMPTS = {
+    "number_plate": 'Extract the number plate from the provided image of a truck. Return the result in a JSON format with the key "number_plate" and the value as the extracted number plate. If the number plate cannot be identified, return null for the value.',
+    "driving_license": 'Extract the driving license number from the provided image of a driving license. Return the result in a JSON format with the key "driving_license_number" and the value as the extracted number. If the number cannot be identified, return null for the value.',
+    "chassis": 'Extract the chassis number from the provided image of a vehicle. Return the result in a JSON format with the key "chassis_number" and the value as the extracted number. If the number cannot be identified, return null for the value.'
+}
+
+
+async def process_image(image_file: UploadFile, prompt_key: str):
+    if image_file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a jpg, jpeg, or png image.")
+    
+    image_data = await image_file.read()
+    image = Image.open(io.BytesIO(image_data))
+    
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+    result = model.generate_content([CUSTOM_PROMPTS[prompt_key], image])
+    
+    try:
+        # Remove code block markers if present
+        clean_text = re.sub(r'```json\s*|\s*```', '', result.text)
+        json_result = json.loads(clean_text)
+        return json_result.get(prompt_key) or json_result.get("number_plate") or json_result.get("chassis_number")
+    except json.JSONDecodeError:
+        logging.error(f"Failed to parse JSON from Gemini AI response: {result.text}")
+        return None
+    
+def clean_string(input_str: str) -> str:
+    # Use regex to remove spaces and special characters, only keeping alphanumeric characters
+    return re.sub(r'[^A-Za-z0-9]', '', input_str)
+
+@router.post("/arrival/")
+async def arrival(
+    vehicle_number: UploadFile = File(...), 
+    chassis: UploadFile = File(...),
+    condition: UploadFile = File(...),
+    license_image: UploadFile = File(...),
+    Container_image: UploadFile = File(...),
+    db:Session= Depends(get_db)):
+
+    try:
+        vehicle_number_text1 = await process_image(vehicle_number, "number_plate")
+        vehicle_number_text = clean_string(vehicle_number_text1)
+        chassis_number_text = await process_image(chassis, "chassis")
+        license_image_Text1 = await process_image(license_image, "number_plate")
+        license_image_Text = clean_string(license_image_Text1)
+    
+        condition_url = save_upload(condition)
+        container_image_url = save_upload(Container_image)
+    
+        print('vehicle_number_text',vehicle_number_text)
+        Vehicle_info_data = db.query(Vehicle_info).filter(Vehicle_info.truck_number == vehicle_number_text).first()
+        if not Vehicle_info_data:
+            raise HTTPException(status_code=404, detail="truck_number  not matched")
+
+        license_image_data = db.query(License_info).filter(License_info.license_number == license_image_Text).first()
+        
+        if not license_image_data:
+            raise HTTPException(status_code=404, detail="Driver license not matched")
+        
+        arrival_db=Arrival(
+            vehicle_number =vehicle_number_text,
+            chassis = chassis_number_text, 
+            condition = condition_url,
+            license_image = license_image_Text,
+            Container_image =container_image_url,
+
+        )
+        db.add(arrival_db)
+        db.commit()
+        db.refresh(arrival_db)
+
+        return {
+             'message':'now you can u go',
+            'arrival_data ':arrival_db, 
+            
+        }
+    except Exception as e:
+        logging.error(f"Error processing the image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,15 @@
 from decouple import config  #pip install python-decouple
 from jwt import PyJWTError  #pip install PyJWT
+
+Create the Virtual Environment:
+Run the following command to create a virtual environment named venv (you can choose a different name if you prefer):
+
+python -m venv venv
+
+Activate the Virtual Environment:
+On Windows:
+venv\Scripts\activate
+
 #######################################################################################################################################################
                                                      for DataBase connection with Mysql
 #######################################################################################################################################################

@@ -1,3 +1,39 @@
+***************************** SQL all command **************
+ create naw database
+ CREATE DATABASE database_name;
+ USE database_name;
+
+ create table
+ CREATE TABLE employees (
+    employee_id INT AUTO_INCREMENT,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    hire_date DATE,
+    salary DECIMAL(10, 2),
+    PRIMARY KEY (employee_id)
+);
+
+ for add new Column in table
+ ALTER TABLE table_name ADD COLUMN new_column_name VARCHAR(233);
+
+ Rename a column:
+ ALTER TABLE parent_information 
+CHANGE COLUMN old_column_name new_column_name datatype;
+
+delete all table data
+TRUNCATE TABLE table_name;
+
+Delete particular data
+DELETE FROM parent_information WHERE parent_id = <parent_id>;
+
+Delete a column:
+ALTER TABLE parent_information 
+
+delete table
+DROP TABLE table_name;
+
+############################################### query_construct ########################################
+
 Certainly! I'll provide a comprehensive list of key SQLAlchemy functions and keywords used for querying and manipulating data in Python. These are commonly used with the SQLAlchemy ORM (Object Relational Mapper).
 
 Query Construction:

@@ -1,0 +1,32 @@
+***************************** git all command **************
+
+ …or create a new repository on the command line
+echo "# OCR_using_easyocr_lib" >> README.md
+
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+git push -u origin main
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+git branch -M main
+git push -u origin main
+
+git remote remove origin
+git remote add origin https://github.com/vinaykumar231/OCR_using_easyocr_lib.git
+
+Create and switch to the new branch:
+git checkout -b new_branch_name
+
+Verify that you are on the new branch:
+git branch
+
+switch to a branch
+git checkout branch_name
+
+show origin
+git remote show origin
+git remote -v
