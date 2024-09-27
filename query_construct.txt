@@ -369,3 +369,112 @@ subquery = (
             .all()
         )
         
+(Q1) what is Enum class
+Ans: Enum is contant value example 
+class UserType(str, Enum):
+    admin = "admin"
+    student = "student"
+    teacher = "teacher"
+    user = "user"
+    parent = "parent"
+   
+(Q2)what is Enumaration function
+Ans : Enumaration is function by using we can Iterate value as well as index as itrator object 
+example 
+attendance_records = []  #empty list for aapend all value 
+    
+    for i, student_id in enumerate(student_ids_list):     #### here i and student_id is a itrator object by using enumeration function
+        student = db.query(Student).filter(Student.id == student_id).first()
+        if not student:
+            raise HTTPException(status_code=404, detail=f"Student with id {student_id} not found")
+        
+        existing_attendance = db.query(Attendance).filter(
+            Attendance.student_id == student_id,
+            Attendance.course_content_id == course_content_id,
+            cast(Attendance.date, Date) == cast(ist_now, Date)
+        ).first()
+        
+        if existing_attendance:
+            existing_attendance.status = [student_status_list[i]],
+            existing_attendance.date = ist_now
+        else:
+            db_attendance = Attendance(
+                student_id=student_id,
+                course_content_id=course_content_id,
+                status=[student_status_list[i]], 
+                date=ist_now
+            )
+            db.add(db_attendance)
+        
+        db.commit()
+
+(Q3)what is zip function
+Ans : this is a function by using that we can Iterate two list of items in loop
+example:
+def calculate_installments(total_amount: float, installment_number: int) -> List[float]:
+    installment_amount = total_amount / installment_number
+    installment_amount = floor(installment_amount)
+    installments = [installment_amount] * installment_number
+    return installments
+
+def calculate_due_dates(installment_number: int) -> List[str]:
+    current_date = datetime.now()
+    due_dates = [(current_date + timedelta(days=i*30)).strftime('%Y-%m-%d') for i in range(1, installment_number+1)]
+    return due_dates
+
+@router.post("/installments/Insert/", response_model=None)
+async def post_payment_details(payment_id: int, total_amount: float, installment_number: int, db: Session = Depends(get_db)):
+    try:
+   
+        existing_payment = db.query(Payment).filter(Payment.payment_id == payment_id).first()
+        if not existing_payment:
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        if total_amount <= 0 or installment_number <= 0:
+            raise HTTPException(status_code=400, detail="Total amount and installment number must be positive")
+
+        installments = calculate_installments(total_amount, installment_number)
+        due_dates = calculate_due_dates(installment_number)
+         
+        installments_and_due_dates = [{"amount": amount, "due_date": date} for amount, date in zip(installments, due_dates)]  ### here installments and due_dates two list of items
+        
+        installments_json = json.dumps(installments_and_due_dates)
+
+        installment = Installment(payment_id=payment_id, total_amount=total_amount, installment_number=installment_number, installments=installments_json)
+        db.add(installment)
+        db.commit()
+        db.refresh(installment)
+        db.close()
+        
+        return installment
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to insert installment: {str(e)}")
+
+(Q4)what is iterator
+Ans : iterator is an object by using that we can itrate squentelly  list of items 
+Example:  c in color: ###here c is an itrator object
+            print(c)
+what is genarator
+Ans: A generator in Python is a special type of iterator that allows you to iterate over data without loading the entire dataset into memory at once. 
+     It uses the yield keyword to return a value and pauses the function’s execution, saving its state for future iterations.
+
+     def count_up_to(max_num):
+    current = 1
+    while current <= max_num:
+        yield current  # yield produces a value and pauses the function's state
+        current += 1
+
+# Using the generator
+for number in count_up_to(5):
+    print(number)
+
+example2:  # List of colors
+colors = ["red", "blue", "green", "yellow"]
+
+# Generator expression that yields colors containing "red"
+filtered_colors = (color for color in colors if "red" in color)
+
+# Looping through the generator and printing filtered colors
+for color in filtered_colors: 
+    print(color)
+
