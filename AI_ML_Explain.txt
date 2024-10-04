@@ -67,6 +67,72 @@ all function of genai libeary(generative AI)
 '__str__', '__subclasshook__', '__weakref__', '_async_client', '_client', '_generation_config', '_get_tools_lib', '_model_name', '_prepare_request', '_safety_settings',
  '_system_instruction', '_tool_config', 
 '_tools', 'cached_content', 'count_tokens', 'count_tokens_async', 'from_cached_content', 'generate_content', 'generate_content_async', 'model_name', 'start_chat']
+
+for generative ai first we have to create promt object in that conatin all prompt the promt can in possible in function format 
+
+def generate_gemini_prompt(job_description: str, resume_text: str) -> str:
+    prompt = f"""
+Here’s the modified prompt with an example output included:
+
+---
+**Modified Prompt:**
+
+Evaluate the following resume against the provided job description and provide a detailed evaluation in a structured JSON format. Ensure that the JSON is valid and properly formatted, with all necessary commas included.
+
+**Job Description:** {job_description}  
+**Resume:** {resume_text}
+
+1. Extract the **email** and **phone number** from the resume.
+2. Include the contact information (email and phone number) in the JSON output.
+3. The JSON should be properly formatted, valid, and include all required commas and syntax.
+
+
+Please include the following keys in the JSON response:
+
+{{
+  "overall_score": <numeric value between 0 and 100>,
+  "relevance": <numeric score between 0 and 10>,
+  "skills_fit": <numeric score between 0 and 10>,
+  "experience_match": <numeric score between 0 and 10>,
+  "cultural_fit": <numeric score between 0 and 10>,
+  "strengths": <list of key strengths>,
+  "weaknesses": <list of key weaknesses or gaps>,
+  "missing_elements": <list of key missing qualifications or experiences>,
+  "recommendations": <list of suggestions for improvement>
+}}
+
+### Example Output:
+
+{{
+  "overall_score": 85,
+  "relevance": 9,
+  "skills_fit": 8,
+  "experience_match": 7,
+  "cultural_fit": 6,
+  "strengths": ["Strong technical skills", "Excellent communication", "Proven team player"],
+  "weaknesses": ["Limited project management experience", "No certifications in relevant technologies"],
+  "missing_elements": ["Experience with agile methodologies", "Leadership roles"],
+  "recommendations": ["Consider obtaining project management certification", "Gain experience in agile environments"]
+   "candidate_info": {{
+    "name": "John Doe",
+    "email": "candidate@example.com",
+    "phone": "+1234567890"
+}}
+}}
+
+Return the response as valid JSON format with proper commas and no syntax errors. 
+"""
+    return prompt
+
+after that we have to create model object than generate_content function use 
+
+genai.configure(api_key=os.environ["API_KEY_gm"])
+
+prompt = generate_gemini_prompt(job_description, resume_text)
+           
+model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+response = model.generate_content(prompt)
+gemini_evaluation = response.text
 ######################################################################################################################################################
 Using Deepface library login
 
