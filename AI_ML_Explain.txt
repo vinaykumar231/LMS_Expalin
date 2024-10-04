@@ -61,6 +61,12 @@ Use help(): You can also use the help() function to get more information about a
 python
 Copy code
 help(model)
+all function of genai libeary(generative AI)
+['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getstate__', '__gt__', '__hash__', 
+'__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', 
+'__str__', '__subclasshook__', '__weakref__', '_async_client', '_client', '_generation_config', '_get_tools_lib', '_model_name', '_prepare_request', '_safety_settings',
+ '_system_instruction', '_tool_config', 
+'_tools', 'cached_content', 'count_tokens', 'count_tokens_async', 'from_cached_content', 'generate_content', 'generate_content_async', 'model_name', 'start_chat']
 ######################################################################################################################################################
 Using Deepface library login
 
