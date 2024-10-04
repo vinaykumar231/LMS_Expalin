@@ -68,7 +68,7 @@ all function of genai libeary(generative AI)
  '_system_instruction', '_tool_config', 
 '_tools', 'cached_content', 'count_tokens', 'count_tokens_async', 'from_cached_content', 'generate_content', 'generate_content_async', 'model_name', 'start_chat']
 
-for generative ai first we have to create promt object in that conatin all prompt the promt can in possible in function format 
+####### for generative ai first we have to create promt object in that conatin all prompt the promt can in possible in function format ####################
 
 def generate_gemini_prompt(job_description: str, resume_text: str) -> str:
     prompt = f"""
@@ -124,7 +124,7 @@ Return the response as valid JSON format with proper commas and no syntax errors
 """
     return prompt
 
-after that we have to create model object than generate_content function use 
+################# after that we have to create model object than generate_content function use #####################################
 
 genai.configure(api_key=os.environ["API_KEY_gm"])
 
