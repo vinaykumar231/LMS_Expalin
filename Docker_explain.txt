@@ -22,7 +22,10 @@ RUN npm install
 
 after that we have run the all code using  CMD
 CMD ["npm", "run", "dev"]
+after build containe image   using dcocker build . command  (here .  dot assign current directory)
 
+ after than we can run image  of continer using
+ docker run -p image id or conatiner name: tag version
 ###########################################################################################
 
 
