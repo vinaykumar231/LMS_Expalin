@@ -1,0 +1,215 @@
+for dockerfile we need to install docker desktop apploaction than login after taht create dockerfile dicted if u want combole all like backend, frontend, and databse than we need to 
+create compose yml file
+
+FROM node:20
+
+WORKDIR /myapp
+
+COPY . /myapp/
+
+RUN npm install
+
+CMD ["npm", "run", "dev"]
+
+Expaination : from node this is bse dependeincides means all librarry depend on node also react is library that react depend on node the why we need to write from node and version 
+
+after ctreate working directory /myapp means we create my app dirctory in comtainr in this we have cpy all code code 
+copy .. 
+or copy [sourse] [destination] directory
+or copy . myapp
+if need intsall any dependeicse in contain r my app than we need to write run command like 
+RUN npm install 
+
+after that we have run the all code using  CMD
+CMD ["npm", "run", "dev"]
+
+###########################################################################################
+
+
+Docker is an open-source platform that automates the deployment, scaling, and management of applications within lightweight containers. Containers package an application and its dependencies together, ensuring that the application runs reliably regardless of the environment (development, testing, or production). Docker enables developers to build, ship, and run applications easily and consistently.
+
+### Key Concepts of Docker
+
+1. **Images**: A Docker image is a lightweight, standalone, executable package that includes everything needed to run a piece of software, including the code, runtime, libraries, and environment variables.
+
+2. **Containers**: A container is a running instance of a Docker image. Containers are isolated from each other and the host system but share the same OS kernel.
+
+3. **Dockerfile**: A text file that contains instructions to build a Docker image. It defines the base image, dependencies, and commands to run when the container starts.
+
+4. **Docker Compose**: A tool for defining and running multi-container Docker applications using a YAML file (like the one you've shared) to configure services, networks, and volumes.
+
+5. **Volumes**: Persistent storage that can be shared between containers or kept separate from them, allowing data to persist across container restarts.
+
+### Common Docker Commands
+
+Here are some commonly used Docker commands:
+
+#### Basic Commands
+
+- **Check Docker Version**
+ 
+  docker --version
+  
+
+- **List Docker Images**
+ 
+  docker images
+  
+
+- **Build an Image from a Dockerfile**
+ 
+  docker build -t <image_name>:<tag> .
+  Example :- docker build -t myapp:latest .
+  
+
+- **Run a Container**
+ 
+  docker run -d -p <host_port>:<container_port> --name <container_name> <image_name>:<tag>
+   Example :- docker run -d -p 8080:80 --name my_web_app nginx:latest
+
+
+- **Stop a Running Container**
+ 
+  docker stop <container_name_or_id>
+  
+
+- **Remove a Stopped Container**
+ 
+  docker rm <container_name_or_id>
+  
+
+- **List Running Containers**
+ 
+  docker ps
+  
+
+- **List All Containers (including stopped ones)**
+ 
+  docker ps -a
+  
+
+- **Remove an Image**
+ 
+  docker rmi <image_name>:<tag>
+  
+
+#### Docker Compose Commands
+
+- **Start Services (in the background)**
+ 
+  docker-compose up -d
+  
+
+- **Start Services (in the foreground)**
+ 
+  docker-compose up
+  
+
+- **Stop Services**
+ 
+  docker-compose down
+  
+
+- **View Logs of Services**
+ 
+  docker-compose logs
+  
+
+- **Execute a Command in a Running Container**
+ 
+  docker exec -it <container_name_or_id> <command>
+  
+
+#### Volume Commands
+
+- **List Docker Volumes**
+ 
+  docker volume ls
+  
+
+- **Remove a Volume**
+
+  docker volume rm <volume_name>
+  
+###################  Docker_file of backem frontend and dabase combine ########################
+### filename = compose.yml ##
+
+ version: '3.8'
+
+services:
+  app:  # FastAPI Backend
+    build:
+      context: ./backend  # Directory where your FastAPI Dockerfile is located
+    volumes:
+      - ./backend:/myapp  # Mount the backend directory
+    ports:
+      - "8001:8001"
+    environment:
+      - SQLALCHEMY_DATABASE_URL=mysql+pymysql://root:root@db:3306/lms_db
+    depends_on:
+      - db
+
+  db:  # MySQL Database
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: lms_db
+    volumes:
+      - db_data:/var/lib/mysql
+
+  frontend:  # Node.js Frontend
+    build:
+      context: ./frontend  # Directory where your frontend Dockerfile is located
+    volumes:
+      - ./frontend:/myapp  # Mount the frontend directory
+    ports:
+      - "3000:3000"  # Expose the port for the frontend application
+    depends_on:
+      - app  # Ensure that the backend service is started before the frontend
+
+volumes:
+  db_data:
+
+
+###################### Docker file only backend  ###################################
+### filename = Dockerfile ##
+
+FROM python:3.12
+
+# Set the working directory in the container
+WORKDIR /myapp
+
+# Copy only the main application file
+COPY main.py /myapp/
+
+# Copy the requirements file
+COPY requirements.txt /myapp/
+
+# Install the dependencies
+RUN pip install -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the port that the app runs on
+EXPOSE 8001
+
+# Command to run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+
+###################### Docker file only Frontend  ###################################
+### filename = Dockerfile ##
+
+FROM node:20
+
+WORKDIR /myapp
+
+COPY . /myapp/
+
+RUN npm install
+
+CMD ["npm", "run", "dev"]
+
+
