@@ -26,6 +26,10 @@ after build containe image   using dcocker build . command  (here .  dot assign 
 
  after than we can run image  of continer using
  docker run -p image id or conatiner name: tag version
+
+ for rebuild 
+ docker build -t lms_frontend:v1.1 .
+
 ###########################################################################################
 
 
