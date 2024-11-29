@@ -1,3 +1,28 @@
+sub Query 
+
+subquery = (
+                    db.query(
+                        Resume_Analysis.candidate_email,
+                        func.max(Resume_Analysis.uploaded_at).label("latest_resume_hr")  
+                    )
+                    .filter(Resume_Analysis.candidate_email == email)  
+                    .group_by(Resume_Analysis.candidate_email)  
+                    .subquery()
+                )
+        resume_analysis = (
+            db.query(Resume_Analysis)
+            .join(
+                subquery,
+                (Resume_Analysis.candidate_email == subquery.c.candidate_email) &
+                (Resume_Analysis.uploaded_at == subquery.c.latest_resume_hr)
+            )
+            .first() 
+        )
+        if not resume_analysis:
+            raise HTTPException(status_code=404, detail="HR not found for this candidate")
+
+
+
 ***************************** SQL all command **************
  create naw database
  CREATE DATABASE database_name;
