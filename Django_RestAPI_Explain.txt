@@ -1,0 +1,287 @@
+git_hub link for code :  https://github.com/vinaykumar231/Django_Restapi_explain.git
+
+Step :1
+
+python -m venv myenv
+myenv\Scripts\activate
+
+pip install django
+pip install django djangorestframework
+pip install django-cors-headers
+
+
+ Step :2 
+
+django-admin startproject restapi_explain
+cd restapi_explain ( in this restapi_explain have stting.py and url.py if u change restapi_explain to main_app  than also u have to change manage.py)
+
+manage.py (changes)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'main_app.settings')
+
+### in setting.py we have change and for extra configuration
+
+INSTALLED_APPS = [
+    'corsheaders',
+    "rest_framework",
+    'django_extensions',
+    "user",
+    'property_data',
+    'property_details',
+]
+
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    ...,
+]
+
+
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.29.85']
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'django_restapi',  # Replace with your database name
+        'USER': 'root',  # Replace with your database user
+        'PASSWORD': 'root',  # Replace with your database password
+        'HOST': 'localhost',  # Can be an IP or hostname for remote databases
+        'PORT': '3306',  # Default MySQL port
+    }
+}
+
+sereved static file image and video 
+
+STATIC_URL = 'static/'
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
+#### parent means univirse url in this all app url conneted here urls.py
+
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include('user.urls')),  # Ensure this includes 'user.urls'
+    path('api/', include('property_data.urls')),
+    path('api/', include('property_details.urls')),
+]  + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+python manage.py runserver 0.0.0.0:8001
+
+step 3
+
+# for create app
+python manage.py startapp property_data
+
+in this there are created subpython file like views.py, model.py, admin.py and apps.py
+
+1) views.py:- in this we have to create api endpits and function logic
+2) model.py:- in this we have create table model means databse field name
+3) admin.py :- in this w have to add model field name for Django admnin dashboard 
+4) apps.py :- no need to change
+5) urls.py :- create file manuaaly not djanfo provide ibnbuild for views.py maaping like router and endpoints
+6) serializers.py :- create file manuaaly not djanfo provide ibnbuild this is use convert Django field to json and also use for validation 
+
+views.py
+
+# Create Property
+@api_view(['POST'])
+@admin_required
+def create_property(request):
+    """API to create a new property"""
+    if request.method == 'POST':
+        # Ensure user_id is part of the request data
+        if 'user_id' not in request.data:
+            return Response({'detail': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Proceed to serialize and save the property
+        serializer = PropertySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()  # Save the new property
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    ############ fom data means multipart form api ########
+
+# Configure file upload folder and allowed extensions
+UPLOAD_FOLDER = "static/images"
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_upload_file(upload_file):
+    if not upload_file or not allowed_file(upload_file.name):  # use .name instead of .filename
+        return None
+
+    try:
+        filename = secure_filename(upload_file.name)  # secure the file name
+        unique_filename = f"{uuid.uuid4()}_{filename}"  # Create a unique filename
+        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)  # Ensure the directory exists
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(upload_file.file, buffer)  # use .file instead of the stream
+
+        return file_path.replace("\\", "/")  # Normalize the path for storage
+
+    except Exception as e:
+        print(f"Error saving file: {str(e)}")
+        return None
+
+
+
+@api_view(['POST'])
+def add_property_details(request):
+    try:
+        # Extract form data
+        property_code = request.POST.get("property_code")
+        rate_buy = request.POST.get("rate_buy")
+        rate_lease = request.POST.get("rate_lease")
+        floor = request.POST.get("floor")
+        unit_no = request.POST.get("unit_no")
+        wing = request.POST.get("wing")
+        car_parking = request.POST.get("car_parking")
+        remarks = request.POST.get("remarks")
+        edit_date = request.POST.get("edit_date")
+        user_id = request.POST.get("user_id")
+
+        # Handle file upload
+        image_file = request.FILES.get("property_image")
+        image_path = save_upload_file(image_file) if image_file else None
+
+        # Get the related Property and AriyanspropertiesUser instances
+        property_instance = Property.objects.get(property_code=property_code)  # Get the Property instance by property_code
+        user_instance = AriyanspropertiesUser.objects.get(user_id=user_id)  # Get the User instance by user_id
+
+        # Create a new PropertyDetails instance
+        property_details = PropertyDetails(
+            property_code=property_instance,
+            rate_buy=rate_buy,
+            rate_lease=rate_lease,
+            floor=floor,
+            unit_no=unit_no,
+            wing=wing,
+            car_parking=car_parking,
+            remarks=remarks,
+            edit_date=edit_date,
+            user_id=user_instance,
+            property_image_path=image_path,
+        )
+
+        property_details.save()
+
+        return JsonResponse({"message": "Property details added successfully!"}, status=status.HTTP_201_CREATED)
+
+    except Property.DoesNotExist:
+        return JsonResponse({"error": "Property with given property_code does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+    except AriyanspropertiesUser.DoesNotExist:
+        return JsonResponse({"error": "User with given user_id does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+model.py
+
+from django.db import models
+
+from user.models import AriyanspropertiesUser
+
+class Property(models.Model):
+    property_code = models.AutoField(primary_key=True)
+    user_id = models.ForeignKey(AriyanspropertiesUser, on_delete=models.CASCADE, to_field='user_id', related_name="properties", null=True)
+    building = models.CharField(max_length=100)
+    address2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    area = models.CharField(max_length=100, blank=True, null=True)
+    pin = models.CharField(max_length=10, blank=True, null=True)
+    des_code = models.CharField(max_length=100, blank=True, null=True)
+    lease_code = models.CharField(max_length=100, blank=True, null=True)
+    status_code = models.CharField(max_length=100, blank=True, null=True)
+    usp = models.CharField(max_length=255, blank=True, null=True)
+    company = models.CharField(max_length=100, blank=True, null=True)
+    contact_person1 = models.CharField(max_length=100, blank=True, null=True)
+    contact_person2 = models.CharField(max_length=100, blank=True, null=True)
+    contact_person3 = models.CharField(max_length=100, blank=True, null=True)
+    c_status = models.CharField(max_length=100, blank=True, null=True)
+    property_type = models.CharField(max_length=100, blank=True, null=True)
+
+    # Meta options to specify table name and other Django settings
+    class Meta:
+        db_table = 'properties'
+
+admin.py
+
+from django.contrib import admin
+from .models import Property
+
+class PropertyAdmin(admin.ModelAdmin):
+    list_display = (
+        'property_code', 
+        'user_id', 
+        'building', 
+        'address2', 
+        'city', 
+        'area', 
+        'pin', 
+        'des_code', 
+        'lease_code', 
+        'status_code', 
+        'usp', 
+        'company', 
+        'contact_person1', 
+        'contact_person2', 
+        'contact_person3', 
+        'c_status', 
+        'property_type'
+    )  # Displaying the property fields in the admin list view
+    search_fields = ['building', 'user_id__user_name', 'city', 'area']  # Search functionality
+    list_filter = ['property_type', 'status_code', 'city']  # Filters on the right side of the list view
+
+admin.site.register(Property, PropertyAdmin)
+
+urls.py
+
+# property/urls.py
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('properties/', views.get_all_properties, name='get_all_properties'),  # Get all properties
+    path('properties/<int:property_code>/', views.get_property_by_id, name='get_property_by_id'),  # Get a property by ID
+    path('properties/create/', views.create_property, name='create_property'),  # Create a new property
+    path('properties/update/<int:property_code>/', views.update_property, name='update_property'),  # Update a property
+    path('properties/delete/<int:property_code>/', views.delete_property, name='delete_property'),  # Delete a property
+]
+
+
+serializers.py
+
+# property/serializers.py
+
+from rest_framework import serializers
+from .models import Property
+
+class PropertySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Property
+        fields = '__all__'  
+
+
+python manage.py makemigrations
+python manage.py migrate
+
+
+###for different port and host
+python manage.py runserver 0.0.0.0:8001 
+
+
+

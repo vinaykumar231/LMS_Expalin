@@ -1,0 +1,263 @@
+Step :1
+python -m venv myenv
+myenv\Scripts\activate
+
+pip install flask flask-restful flask-sqlalchemy flask-migrate
+
+pip install flask flask-restful flask-sqlalchemy flask-migrate python-dotenv flask-jwt-extended pymysql
+
+
+Dependencies Explanation:
+flask → Core framework for web applications.
+flask-restful → Provides tools for building RESTful APIs.
+flask-sqlalchemy → ORM (Object-Relational Mapping) for database interaction.
+flask-migrate → Handles database migrations.
+
+
+ Step :2 
+flask_api_project/
+│── api.py
+│   ├── endpoints/
+│   │   ├── user.py
+│   │   ├── propertyDetails.py
+│   ├── models/
+│   │   ├── user.py
+│   │   ├── propertyDetails.py
+│── auth/
+│   ├── auth_bearer.py
+│   ├── auth_handler.py
+│── static/
+│── requirements.txt
+│── database.py
+│── .env
+│── venv/ (if using virtualenv)
+│── app.py
+
+api/model/user.py
+
+from flask import current_app
+from sqlalchemy import TIMESTAMP, Column, Integer, String, func
+from database import db
+from sqlalchemy.orm import relationship
+
+class User(db.Model):
+    __tablename__ = 'users'
+
+    user_id = Column(Integer, primary_key=True) ###user
+    user_name = Column(String(80), unique=True, nullable=False)
+    password = Column(String(128), nullable=False)
+    email = Column(String(120), unique=True, nullable=False)
+    user_type =Column(String(120), nullable=False)
+    updated_on = Column(TIMESTAMP, server_default=func.now(), onupdate=func.current_timestamp())
+
+    def __repr__(self):
+        return f"<User {self.username}>"
+
+api/model/propertyDetails.py
+
+
+import datetime
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from database import db
+from sqlalchemy.orm import relationship
+
+
+# 'P123', 1000000, 5000, 10, '10A', 'East Wing', '2 slots', 'Spacious and well-lit', '2025-01-06', 1
+
+class Property_Detils(db.Model):
+    __tablename__ = "property_details"
+    id = Column(Integer, primary_key=True, index=True)
+    property_code = Column(Integer, ForeignKey("property.property_code"))
+    property_image_Path = Column(String(250))
+    rate_buy = Column(Float)
+    rate_lease = Column(Float)
+    floor = Column(Integer)
+    unit_no = Column(String(50))
+    wing = Column(String(50))
+    car_parking = Column(String(50))
+    remarks = Column(Text)
+    edit_date = Column(DateTime)  # Correct usage
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+
+   
+    property = relationship("Property", backref="property_details")
+    user = relationship("User", backref="property_details")
+
+api/endpoints/user.py
+
+@auth_bp.route('/register', methods=["POST"])
+def register():
+    data = request.get_json() 
+    try:
+        db = get_db()
+        hashed_password = bcrypt.hashpw(data["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        user_db = User(
+            user_name=data["user_name"],
+            password=hashed_password,
+            email=data["email"],
+            user_type=data.get("user_type", UserType.user.value)  
+        )
+
+        db.add(user_db)
+        db.commit()
+
+        return jsonify({"message": "User registered successfully", "user": user_db.user_id}), 201
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": "User registration failed"}), 500
+
+api/endpoints/propertyDetails.py
+
+# Configuration for file uploads
+UPLOAD_FOLDER = "static/images"
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
+
+# Function to check allowed file types
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Function to save uploaded file
+def save_upload_file(upload_file):
+    if not upload_file or not allowed_file(upload_file.filename):
+        return None
+    
+    try:
+        # Ensure a secure filename
+        filename = secure_filename(upload_file.filename)
+        unique_filename = f"{uuid.uuid4()}_{filename}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # Save file correctly
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(upload_file.stream, buffer)
+
+        # Return relative file path for storing in the database
+        return file_path.replace("\\", "/")  # Normalize path
+
+    except Exception as e:
+        print(f"Error saving file: {str(e)}")
+        return None
+
+
+@property_details_bp.route("/property_details", methods=["POST"])
+def add_property_details():
+    try:
+        # Extract form data
+        property_code = request.form.get("property_code")
+        rate_buy = request.form.get("rate_buy")
+        rate_lease = request.form.get("rate_lease")
+        floor = request.form.get("floor")
+        unit_no = request.form.get("unit_no")
+        wing = request.form.get("wing")
+        car_parking = request.form.get("car_parking")
+        remarks = request.form.get("remarks")
+        edit_date = request.form.get("edit_date")
+        user_id = request.form.get("user_id")
+
+        # Handle file upload
+        image_file = request.files.get("property_image")
+        image_path = save_upload_file(image_file) if image_file else None
+
+        # Create a new Property_Detils instance
+        property_details = Property_Detils(
+            property_code=property_code,
+            rate_buy=rate_buy,
+            rate_lease=rate_lease,
+            floor=floor,
+            unit_no=unit_no,
+            wing=wing,
+            car_parking=car_parking,
+            remarks=remarks,
+            edit_date=edit_date,
+            user_id=user_id,
+            property_image_Path=image_path,  # Store image path in the database
+        )
+
+        # Add to database
+        db.session.add(property_details)
+        db.session.commit()
+
+        return jsonify({"message": "Property details added successfully!"}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+database.py
+
+from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# Initialize SQLAlchemy instance
+db = SQLAlchemy()
+
+# Function to initialize the database
+def init_db(app):
+    app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:root@localhost:3306/flask_db"
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db.init_app(app)
+
+# Function to get db session
+def get_db():
+    return db.session
+ app.py
+
+from flask import Flask, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_swagger_ui import get_swaggerui_blueprint
+from api.endpoints.property import property_blueprint
+from api.endpoints.propertyDetails import property_details_bp
+from api.endpoints.user import auth_bp
+from database import init_db  # Import your blueprint
+from api.models.property import Property, db
+from api.models.propertyDetails import Property_Detils
+
+
+
+app = Flask(__name__)
+
+migrate = Migrate(app, db)
+
+init_db(app)
+
+
+SWAGGER_URL = '/swagger'  
+API_URL = '/static/swagger.json' 
+
+
+swagger_ui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,  
+    API_URL,  
+    config={  
+        'app_name': "Flask Property API"
+    }
+)
+
+# Register Swagger UI blueprint
+app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
+
+# Register blueprints (routes)
+app.register_blueprint(property_blueprint, url_prefix="/api")
+app.register_blueprint(property_details_bp, url_prefix="/api")
+app.register_blueprint(auth_bp, url_prefix="/api")
+
+
+# Run the app
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()  # Create all tables
+    app.run(debug=True, host="0.0.0.0", port=8003)
+
+
+    
+run app 
+python app.py
+
