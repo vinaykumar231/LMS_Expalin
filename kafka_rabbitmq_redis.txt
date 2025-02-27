@@ -1,0 +1,172 @@
+Kafka
+What it is: Apache Kafka is a distributed event streaming platform that can handle high volumes of data in real-time.
+Architecture:
+
+It works using a publish-subscribe model where "producers" send messages to "topics"
+"Consumers" subscribe to these topics to receive messages
+Messages are stored in an ordered sequence called a "log"
+Kafka clusters have multiple servers (brokers) that store copies of the data for reliability
+
+Architecture
+
+Kafka Architecture Explained in Simple Terms
+
+Brokers: Think of brokers as individual storage units in a storage facility. Each broker is a server that stores a portion of the data. Together, multiple brokers form a Kafka cluster.
+Topics: Like channels on TV. Each topic is a category or feed name where messages are published. For example, "customer_orders" or "website_clicks".
+Partitions: Imagine dividing a book into chapters so multiple people can read different parts simultaneously. Topics are divided into partitions to allow parallel processing.
+Producers: Like reporters sending news to a TV station. Applications that send data to Kafka topics.
+Consumers: Like viewers watching specific TV channels. Applications that read data from Kafka topics.
+Consumer Groups: Similar to families sharing a TV subscription where each person watches different channels. Multiple consumers working together to process data.
+ZooKeeper: Like a manager who keeps track of which storage units (brokers) are working properly. It helps coordinate the Kafka cluster.
+
+Real-world use case:
+Imagine a large e-commerce website like Amazon. When you browse products, add items to your cart, and make purchases, each of these actions generates events. Kafka can capture all these events in real-time, allowing different systems to react accordingly:
+
+Inventory systems update stock levels
+Recommendation engines update your personalized suggestions
+Analytics tools track user behavior patterns
+Fraud detection systems monitor for suspicious activity
+
+################# RabbitMQ  ##############
+What it is: RabbitMQ is a message broker that enables applications to communicate with each other by passing messages.
+Architecture:
+
+Uses the Advanced Message Queuing Protocol (AMQP)
+Publishers send messages to "exchanges"
+Exchanges route messages to "queues" based on rules
+Consumers retrieve messages from queues
+Supports various messaging patterns (direct, fanout, topic)
+
+RabbitMQ Architecture Explained in Simple Terms
+
+Publishers: Like mail senders who drop letters in mailboxes. Applications that send messages to RabbitMQ.
+Exchanges: Similar to the sorting office at a post office. They receive messages and route them to the right queues based on rules.
+Bindings: Like the sorting rules used by postal workers. They tell exchanges which messages should go to which queues.
+Queues: Like mailboxes that hold messages until someone picks them up. Messages wait in queues until consumers retrieve them.
+Consumers: Like people checking their mailboxes. Applications that retrieve and process messages from queues.
+Exchange Types:
+
+Direct: Like addressing a letter to a specific person
+Fanout: Like sending the same newsletter to everyone
+Topic: Like sending mail based on interests (e.g., "sports fans in New York")
+
+Real-world use case:
+Consider a food delivery app like DoorDash. When you place an order:
+
+The app sends a message to RabbitMQ
+RabbitMQ routes this message to different services:
+
+A message goes to the restaurant's system
+Another message goes to the payment processing service
+A third message goes to the delivery driver assignment system
+
+
+Each service processes its part of the order independently
+If any service is temporarily down, RabbitMQ holds the messages until they're back online
+
+ ###################  Redis  ##########################
+What it is: Redis is an in-memory data store that can function as a database, cache, and message broker.
+Architecture:
+
+Stores data primarily in memory (RAM) for fast access
+Supports various data structures (strings, lists, sets, hashes)
+Can persist data to disk for durability
+Offers optional replication for high availability
+
+Redis Architecture Explained in Simple Terms
+
+In-Memory Storage: Like keeping frequently used items on your desk instead of in a filing cabinet. Redis stores data in RAM for super-fast access.
+Data Structures: Different ways to organize information:
+
+Strings: Simple text or numbers (like notes)
+Lists: Ordered collections (like a to-do list)
+Sets: Unique collections (like a list of friends with no duplicates)
+Hashes: Collections of field-value pairs (like a contact card)
+
+
+Persistence Options:
+
+RDB: Like taking snapshots of your desk at intervals
+AOF: Like keeping a journal of every change you make
+
+
+Replication: Like having an assistant who keeps an identical copy of your desk setup. If your desk breaks, you can use theirs instead.
+Clients: Applications that connect to Redis to store or retrieve data.
+Master-Replica Setup: One main Redis server (master) with copies (replicas) that stay in sync. If the master fails, a replica can take over.
+
+Real-world use case:
+Imagine a social media platform like Twitter:
+
+Redis caches frequently accessed user profiles and recent tweets
+When you refresh your feed, instead of querying the main database (slow), the app checks Redis first (very fast)
+The platform uses Redis to track trending topics by counting hashtag mentions
+Login sessions are managed using Redis's fast key-value storage
+Rate limiting (preventing spam) is implemented by tracking request counts in Redis
+
+Key Differences and When to Use Each
+
+Kafka: Best for high-volume event streaming, data pipelines, and when you need to replay message history
+RabbitMQ: Great for complex routing scenarios, when you need guaranteed message delivery, and traditional queuing
+Redis: Ideal for caching, real-time leaderboards, session storage, and situations requiring extremely fast data access
+
+#####################
+
+Kafka: Great for handling millions of events per second, like tracking user actions on a busy website
+RabbitMQ: Perfect for ensuring important messages (like orders) get processed reliably, even if systems temporarily fail
+Redis: Ideal for situations needing lightning-fast responses, like showing real-time gaming leaderboards or storing shopping cart data
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+@router.get("/get_all_users/")
+def get_current_user_details(db: Session = Depends(get_db)):
+    cache_key = "all_users_cache"
+
+    # 🔹 Check Redis Cache
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        logging.info("✅ Using Cached Data")
+        return {"source": "cache", "data": json.loads(cached_data)}
+
+    # 🔹 Fetch from DB
+    logging.info("🚨 Cache Miss! Fetching from Database")
+    all_users = db.query(AI_calling).all()
+    user_list = [{"user_id": user.user_id, "username": user.user_name, "email": user.user_email} for user in all_users]
+
+    # 🔹 Store in Redis
+    redis_client.setex(cache_key, 300, json.dumps(user_list))
+    return {"source": "database", "data": user_list}
+
+
+from celery import Celery
+import time
+
+# Configure Celery with Redis as a broker
+celery_app = Celery(
+    "tasks",
+    broker="redis://localhost:6379/0",  # Redis as the message broker
+    backend="redis://localhost:6379/0"  # Store task results in Redis
+)
+
+
+
+@celery_app.task
+def send_email(email: str, message: str):
+    """Simulate sending an email (time-consuming task)."""
+    time.sleep(5)  # Simulate email sending delay
+    return f"✅ Email sent to {email} with message: {message}"
+
+@router.post("/send-email/")
+async def send_email_api(email: str, message: str):
+    """Trigger an email sending task."""
+    task = send_email.delay(email, message)  # Asynchronous Celery Task
+    return {"task_id": task.id, "message": "✅ Email is being sent!"}
+
+@router.get("/task-status/{task_id}")
+async def get_task_status(task_id: str):
+    """Check the status of a Celery task."""
+    result = celery_app.AsyncResult(task_id)  # ✅ Corrected the way to check task status
+    return {"task_id": task_id, "status": result.state, "result": str(result.result)}
+
+

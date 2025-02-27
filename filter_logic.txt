@@ -1,0 +1,130 @@
+@app.get("/properties/")
+def get_properties_between_areas(
+    from_area_name: str = Query(...),
+    to_area_name: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    # Query Area table to get area IDs based on area names
+    from_area = db.query(Area).filter(Area.area_name == from_area_name).first()
+    to_area = db.query(Area).filter(Area.area_name == to_area_name).first()
+
+    if not from_area or not to_area:
+        return {"error": "Invalid area name"}
+
+    # Get area_ids for filtering
+    from_area_id = from_area.area_id
+    to_area_id = to_area.area_id
+
+    if from_area_id > to_area_id:
+        from_area_id, to_area_id = to_area_id, from_area_id  # Ensure correct order
+
+    # Query properties with area_id between from_area_id and to_area_id
+    properties = db.query(Property).filter(
+        Property.area_id.between(from_area_id, to_area_id)
+    ).all()
+
+    return properties
+
+
+from sqlalchemy import and_
+
+@router.get("/filter_properties/")
+async def filter_properties(
+    city_name: str = None,
+    area_name: str = None,
+    property_code: str = None,
+    lease_type: str = None,
+    db: Session = Depends(get_db)
+):
+    try:
+        query = db.query(Property)
+
+        # Build the filtering logic using and_ to combine conditions
+        conditions = []
+        if city_name:
+            conditions.append(Property.city == city_name)
+        if area_name:
+            conditions.append(Area.area_name == area_name)
+        if property_code:
+            conditions.append(Property.property_code == property_code)
+        if lease_type:
+            conditions.append(LeaseSale.lease_type == lease_type)
+
+        if conditions:
+            query = query.filter(and_(*conditions))
+
+        # Execute the query
+        properties = query.all()
+
+        return {"properties": properties}
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred while filtering properties.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+from sqlalchemy import and_
+
+@router.get("/filter_properties/")
+async def filter_properties(
+    city_name: str = None,
+    area_name: str = None,
+    property_code: str = None,
+    lease_type: str = None,
+    db: Session = Depends(get_db)
+):
+    try:
+        query = db.query(Property)
+
+        # Build the filtering logic using and_ to combine conditions
+        conditions = []
+        if city_name:
+            conditions.append(Property.city == city_name)
+        if area_name:
+            conditions.append(Area.area_name == area_name)
+        if property_code:
+            conditions.append(Property.property_code == property_code)
+        if lease_type:
+            conditions.append(LeaseSale.lease_type == lease_type)
+
+        if conditions:
+            query = query.filter(and_(*conditions))
+
+        # Execute the query
+        properties = query.all()
+
+        return {"properties": properties}
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred while filtering properties.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+from sqlalchemy.orm import aliased
+
+@router.get("/search_properties/")
+async def search_properties(
+    search_text: str = None,
+    db: Session = Depends(get_db)
+):
+    try:
+        query = db.query(Property)
+
+        if search_text:
+            query = query.filter(
+                Property.project_name.ilike(f"%{search_text}%") |
+                Property.city.ilike(f"%{search_text}%") |
+                Property.address2.ilike(f"%{search_text}%")
+            )
+
+        properties = query.all()
+
+        return {"properties": properties}
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred while searching properties.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
