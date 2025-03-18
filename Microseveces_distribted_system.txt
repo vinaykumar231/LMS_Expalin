@@ -215,3 +215,37 @@ Team Autonomy: Separate teams can work on different services independently
 Faster Deployment: Smaller codebases are easier to test and deploy
 
 Would you like me to elaborate on any specific aspect of microservices architecture?RetryClaude does not have the ability to run the code it generates yet.
+
+
+
+server {
+    listen 80;  # The restaurant's main entrance for customers
+    server_name YOUR_DOMAIN_OR_PUBLIC_IP;  # Your restaurant's name or address
+
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8001;  # Send admin requests to the admin kitchen
+    }
+
+    location /user/ {
+        proxy_pass http://127.0.0.1:8002;  # Send user-related requests to user service
+    }
+
+    location /order/ {
+        proxy_pass http://127.0.0.1:8003;  # Send food order requests to order service
+    }
+
+    location /payment/ {
+        proxy_pass http://127.0.0.1:8004;  # Send payment processing requests
+    }
+
+    location /delivery/ {
+        proxy_pass http://127.0.0.1:8005;  # Send delivery tracking requests
+    }
+
+    location /static/ {
+        alias /home/ubuntu/fastapi_project/static/;  # Serve images and menu files
+    }
+}  location means  home/ubantu= loaction is correct
+
+
+###The alias means that when a user visits YOUR_DOMAIN/static/, Nginx will serve files from /home/ubuntu/fastapi_project/static/.
