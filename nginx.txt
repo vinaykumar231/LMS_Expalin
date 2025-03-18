@@ -108,3 +108,66 @@ Now, your FastAPI project **is disabled** and no longer accessible.
 | **Disable FastAPI site** | `sudo rm /etc/nginx/sites-enabled/myfastapi` |
 
 Now your FastAPI app is **active and running through Nginx**! 🚀🎯
+
+
+
+########################################### satatic file permisison ########################
+
+### **🔒 How to Set Permissions for the Static Folder in Nginx?**  
+
+If Nginx cannot serve static files (CSS, JS, images) and you get **403 Forbidden** or **Permission Denied**, it’s usually due to incorrect folder permissions.  
+
+---
+
+## **🔍 1️⃣ Check Current Permissions**  
+Run this command to check permissions:  
+```bash
+ls -ld /home/ubuntu/fastapi_project/static/
+```
+If it shows something like:
+```
+drwx------ 2 ubuntu ubuntu 4096 Mar 18 12:00 static
+```
+It means **only the owner (ubuntu) can access it**, and Nginx is blocked.
+
+---
+
+## **🛠️ 2️⃣ Fix Permissions**  
+
+### **✔ Option 1: Give Read Permission to Everyone**  
+```bash
+sudo chmod -R 755 /home/ubuntu/fastapi_project/static/
+```
+📌 **What does this do?**  
+- `7 (rwx)`: Owner (read, write, execute)  
+- `5 (r-x)`: Group (read, execute)  
+- `5 (r-x)`: Others (read, execute)  
+
+---
+
+### **✔ Option 2: Set Correct Ownership (Recommended)**  
+Nginx runs as the `www-data` user, so change ownership:  
+```bash
+sudo chown -R www-data:www-data /home/ubuntu/fastapi_project/static/
+```
+📌 **Why?**  
+- `www-data:www-data` makes sure Nginx owns the files and can serve them.
+
+---
+
+### **✔ Option 3: Allow Nginx to Access the Parent Directory**  
+If the `static` folder is inside `/home/ubuntu/fastapi_project/`, but Nginx still can't access it, run:
+```bash
+sudo chmod +x /home/ubuntu
+sudo chmod +x /home/ubuntu/fastapi_project
+```
+📌 **Why?**  
+- The `+x` permission lets Nginx **enter the directories** without seeing other files.
+
+---
+
+## **✅ Final Step: Restart Nginx**
+```bash
+sudo systemctl restart nginx
+```
+Now, your static files should load! 🚀 🎉
