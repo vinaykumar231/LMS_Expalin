@@ -1,0 +1,23 @@
+class UserBalance(Base):
+    __tablename__ = "user_balance_tb"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    balance = Column(Float, default=0.0)
+    last_email_sent = Column(DateTime, nullable=True, default=None)
+
+    users = relationship("AI_calling", back_populates="user_balance")
+
+    payment_history = relationship("PaymentTransaction", back_populates="user_balance", foreign_keys="[PaymentTransaction.user_id]")
+
+    class PaymentHistory(Base):
+    __tablename__ = "payment_history"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    transaction_type = Column(String(50), nullable=False)  # "Deposit" or "Deduction"
+    amount = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    description = Column(String(255), nullable=True)
+
+    user = relationship("UserBalance", back_populates="payment_history")
+
+UserBalance.payment_history = relationship("PaymentHistory", back_populates="user")

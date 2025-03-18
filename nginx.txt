@@ -1,0 +1,110 @@
+### **How to Activate Your FastAPI Project with Nginx?**
+To make your FastAPI project **active** and **accessible via Nginx**, follow these steps:
+
+---
+
+## **1️⃣ Check If Your Nginx is Running**
+First, check if Nginx is **already running** on your server:
+```bash
+sudo systemctl status nginx
+```
+- **If it's active** (green text, running), go to step 2.  
+- **If it's inactive**, start it using:
+```bash
+sudo systemctl start nginx
+```
+- **Enable Nginx to start on boot:**
+```bash
+sudo systemctl enable nginx
+```
+
+---
+
+## **2️⃣ Activate Your Nginx Configuration File**
+Your FastAPI project needs a configuration file in **Nginx** to be active.
+
+### **📂 File Location:**
+Nginx configurations are stored in:
+```bash
+/etc/nginx/sites-available/
+```
+But to **activate a site**, we must create a **symbolic link** in:
+```bash
+/etc/nginx/sites-enabled/
+```
+
+### **Check If Your FastAPI Config is Active**
+Run this command to list enabled sites:
+```bash
+ls -l /etc/nginx/sites-enabled/
+```
+- If your FastAPI project **is listed**, it's already active.  
+- If it's **not listed**, activate it using the next step.
+
+---
+
+## **3️⃣ Enable Your FastAPI Site (Make It Active)**
+If your FastAPI config file (e.g., `myfastapi`) is in **`sites-available/`** but NOT in **`sites-enabled/`**, enable it by running:
+```bash
+sudo ln -s /etc/nginx/sites-available/myfastapi /etc/nginx/sites-enabled/
+```
+💡 **This makes the configuration active.** It links the file to the enabled directory.
+
+---
+
+## **4️⃣ Test the Nginx Configuration**
+Before restarting Nginx, check if the configuration is correct:
+```bash
+sudo nginx -t
+```
+- If the output shows **"syntax is OK"**, move to the next step.
+- If there's an error, open the file and fix the issue:
+```bash
+sudo nano /etc/nginx/sites-available/myfastapi
+```
+Then save and exit (`CTRL + X`, then `Y`, then `Enter`).
+
+---
+
+## **5️⃣ Restart Nginx to Apply Changes**
+Now restart Nginx to apply the new settings:
+```bash
+sudo systemctl restart nginx
+```
+
+---
+
+## **6️⃣ Verify If Your Site is Running**
+Run:
+```bash
+sudo systemctl status nginx
+```
+If everything is correct, your FastAPI project is **active and accessible**! 🎯
+
+---
+
+## **How to Disable Your FastAPI Project?**
+If you want to **disable your FastAPI Nginx config**, remove the symbolic link:
+```bash
+sudo rm /etc/nginx/sites-enabled/myfastapi
+```
+Then restart Nginx:
+```bash
+sudo systemctl restart nginx
+```
+Now, your FastAPI project **is disabled** and no longer accessible.
+
+---
+
+### **🚀 Summary**
+| Task  | Command |
+|--------|---------|
+| **Check if Nginx is running** | `sudo systemctl status nginx` |
+| **Start Nginx** | `sudo systemctl start nginx` |
+| **Enable Nginx on boot** | `sudo systemctl enable nginx` |
+| **Enable FastAPI config** | `sudo ln -s /etc/nginx/sites-available/myfastapi /etc/nginx/sites-enabled/` |
+| **Check Nginx config** | `sudo nginx -t` |
+| **Restart Nginx** | `sudo systemctl restart nginx` |
+| **Disable FastAPI site** | `sudo rm /etc/nginx/sites-enabled/myfastapi` |
+
+Now your FastAPI app is **active and running through Nginx**! 🚀🎯

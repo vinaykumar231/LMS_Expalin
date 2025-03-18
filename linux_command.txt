@@ -1,0 +1,241 @@
+Here are the **basic Linux commands** to navigate directories, create files, and manage your project structure in **MobaXterm** (or any SSH terminal like PuTTY):
+
+---
+
+## **📌 1. Navigate to a Directory (`cd`)**
+### **Syntax:**
+```bash
+cd /path/to/directory
+```
+### **Examples:**
+- Move to **home directory**:
+  ```bash
+  cd ~
+  ```
+- Move to **specific directory**:
+  ```bash
+  cd /home/ubuntu/myproject/
+  ```
+- Move **one level up**:
+  ```bash
+  cd ..
+  ```
+- Move to the **root directory**:
+  ```bash
+  cd /
+  ```
+
+---
+
+## **📌 2. Create a New Directory (`mkdir`)**
+### **Syntax:**
+```bash
+mkdir directory_name
+```
+### **Examples:**
+- Create a new directory **"myproject"**:
+  ```bash
+  mkdir myproject
+  ```
+- Create multiple directories at once:
+  ```bash
+  mkdir dir1 dir2 dir3
+  ```
+- Create a directory **inside another directory**:
+  ```bash
+  mkdir -p myproject/app/static
+  ```
+  (**`-p` ensures parent directories are created if they don't exist**)
+
+---
+
+## **📌 3. Create a New File (`touch` or `nano`)**
+### **Syntax:**
+```bash
+touch filename
+nano filename
+```
+### **Examples:**
+- Create an empty **main.py** file:
+  ```bash
+  touch main.py
+  ```
+- Create multiple files at once:
+  ```bash
+  touch file1.txt file2.txt file3.txt
+  ```
+- Create & edit a file using **nano**:
+  ```bash
+  nano config.json
+  ```
+  (After editing, **press** `CTRL + X`, then **press** `Y`, then **Enter` to save changes**)
+
+---
+
+## **📌 4. List Files & Directories (`ls`)**
+### **Syntax:**
+```bash
+ls [options]
+```
+### **Examples:**
+- List **all files and directories**:
+  ```bash
+  ls
+  ```
+- List **detailed file info**:
+  ```bash
+  ls -l
+  ```
+- List **hidden files**:
+  ```bash
+  ls -a
+  ```
+- List files **with human-readable sizes**:
+  ```bash
+  ls -lh
+  ```
+
+---
+
+## **📌 5. Move or Rename a File (`mv`)**
+### **Syntax:**
+```bash
+mv old_name new_name
+mv file /destination/path/
+```
+### **Examples:**
+- Rename `main_old.py` → `main.py`:
+  ```bash
+  mv main_old.py main.py
+  ```
+- Move a file to another directory:
+  ```bash
+  mv main.py /home/ubuntu/myproject/
+  ```
+
+---
+
+## **📌 6. Delete Files & Directories (`rm`)**
+### **Syntax:**
+```bash
+rm filename
+rm -r directory_name
+```
+### **Examples:**
+- Delete a file:
+  ```bash
+  rm file.txt
+  ```
+- Delete a directory:
+  ```bash
+  rm -r myproject/
+  ```
+- **Force delete without confirmation:**
+  ```bash
+  rm -rf myproject/
+  ```
+
+---
+
+## **📌 7. Check Your Current Directory (`pwd`)**
+### **Syntax:**
+```bash
+pwd
+```
+✅ **Example Output:**
+```
+/home/ubuntu/myproject
+```
+
+---
+
+## **📌 8. View File Contents (`cat`, `less`, `head`, `tail`)**
+### **Syntax & Examples:**
+- View contents of a file:
+  ```bash
+  cat main.py
+  ```
+- View file with scrolling (`q` to quit):
+  ```bash
+  less main.py
+  ```
+- Show the **first 10 lines** of a file:
+  ```bash
+  head main.py
+  ```
+- Show the **last 10 lines** of a file:
+  ```bash
+  tail -n 10 main.py
+  ```
+- **Continuously monitor logs**:
+  ```bash
+  tail -f /var/log/nginx/error.log
+  ```
+
+---
+
+## **📌 9. Check Running Processes (`ps` & `htop`)**
+- List all running processes:
+  ```bash
+  ps aux
+  ```
+- Find FastAPI running process:
+  ```bash
+  ps aux | grep fastapi
+  ```
+- Kill a process by PID (replace `1234` with actual PID):
+  ```bash
+  kill 1234
+  ```
+- Install & use **htop** (if not installed):
+  ```bash
+  sudo apt install htop
+  htop
+  ```
+  (Press **F10** to exit `htop`)
+
+---
+
+## **📌 10. Check System Logs (`journalctl` & `dmesg`)**
+- View system logs:
+  ```bash
+  journalctl -xe
+  ```
+- Check **Nginx logs**:
+  ```bash
+  sudo tail -f /var/log/nginx/access.log
+  ```
+- Check **Gunicorn logs**:
+  ```bash
+  sudo journalctl -u gunicorn --no-pager
+  ```
+
+---
+
+## **✅ Summary of Important Commands**
+| **Action**            | **Command**                                |
+|----------------------|--------------------------------|
+| Change Directory | `cd /path/to/dir` |
+| Create Directory | `mkdir dirname` |
+| Create File | `touch filename` |
+| Edit File | `nano filename` |
+| List Files | `ls -lah` |
+| Move/Rename File | `mv oldname newname` |
+| Delete File | `rm filename` |
+| Delete Directory | `rm -r dirname` |
+| Check Current Directory | `pwd` |
+| View File Content | `cat filename` |
+| View Logs in Real-time | `tail -f /var/log/nginx/error.log` |
+
+---
+
+## **🔥 Bonus: Deploy FastAPI as a Background Process**
+Instead of running FastAPI manually, use **`nohup`**:
+```bash
+nohup gunicorn -c gunicorn_conf.py app.main:app &
+```
+✅ **FastAPI will keep running even after closing the terminal.**
+
+---
+
+Let me know if you need more details! 🚀😊

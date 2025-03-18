@@ -1,0 +1,241 @@
+### **🚀 All Required `sudo`, `vim`, and `nano` Commands for Deploying a FastAPI Project on AWS EC2 with Nginx**  
+
+---
+
+## **📌 Step 1: Connect to Your AWS EC2 Instance using MobaXterm**  
+1. Open **MobaXterm**.  
+2. Click on **Session → SSH**.  
+3. Enter your **EC2 public IP** and click **OK**.  
+4. If using a `.pem` key, navigate to **Settings → SSH Keys** and add your key.  
+
+Now, you are inside your EC2 instance.
+
+---
+
+## **📌 Step 2: Update & Upgrade Ubuntu**
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+---
+
+## **📌 Step 3: Install Required Packages**
+```bash
+sudo apt install python3 python3-pip python3-venv nginx -y
+```
+
+---
+
+## **📌 Step 4: Create Project Directory**
+```bash
+mkdir fastapi_project
+cd fastapi_project
+```
+
+---
+
+## **📌 Step 5: Set Up a Virtual Environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+---
+
+## **📌 Step 6: Install FastAPI & Uvicorn**
+```bash
+pip install fastapi uvicorn
+```
+
+---
+
+## **📌 Step 7: Create FastAPI Main File**
+```bash
+nano main.py
+```
+**Paste this code into `main.py`:**
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "FastAPI is running on AWS EC2"}
+
+@app.get("/hello")
+def read_hello():
+    return {"message": "Hello from FastAPI!"}
+```
+Press **CTRL + X**, then **Y**, then **ENTER** to save.
+
+---
+
+## **📌 Step 8: Test FastAPI Locally**
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+Check in your browser:  
+👉 `http://your-ec2-public-ip:8000`
+
+---
+
+## **📌 Step 9: Set Up FastAPI as a System Service**
+```bash
+sudo nano /etc/systemd/system/fastapi.service
+```
+**Paste this:**
+```ini
+[Unit]
+Description=FastAPI Service
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/fastapi_project
+ExecStart=/home/ubuntu/fastapi_project/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+
+[Install]
+WantedBy=multi-user.target
+```
+Save and exit (**CTRL + X → Y → ENTER**).
+
+---
+
+## **📌 Step 10: Start and Enable FastAPI Service**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start fastapi
+sudo systemctl enable fastapi
+```
+
+Check if FastAPI is running:
+```bash
+sudo systemctl status fastapi
+```
+
+---
+
+## **📌 Step 11: Configure Nginx as a Reverse Proxy**
+```bash
+sudo nano /etc/nginx/sites-available/fastapi
+```
+**Paste this:**
+```nginx
+server {
+    listen 80;
+    server_name your-ec2-public-ip;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+Save and exit.
+
+---
+
+## **📌 Step 12: Enable Nginx Configuration**
+```bash
+sudo ln -s /etc/nginx/sites-available/fastapi /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+---
+
+## **📌 Step 13: Allow Traffic in Firewall**
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
+```
+
+---
+
+## **📌 Step 14: Check FastAPI with Nginx**
+Now, open your browser and go to:
+👉 `http://your-ec2-public-ip`
+
+🚀 **FastAPI is now deployed on AWS EC2 with Nginx!** 🎉
+
+---
+
+## **📌 Step 15: Serve Static Files (Optional)**
+1. **Create a Static Folder:**
+   ```bash
+   mkdir static
+   ```
+2. **Edit `main.py` to Serve Static Files:**
+   ```bash
+   nano main.py
+   ```
+   **Add this:**
+   ```python
+   from fastapi.staticfiles import StaticFiles
+   app.mount("/static", StaticFiles(directory="static"), name="static")
+   ```
+3. **Modify Nginx Config:**
+   ```bash
+   sudo nano /etc/nginx/sites-available/fastapi
+   ```
+   **Add this inside the `server` block:**
+   ```nginx
+   location /static/ {
+       alias /home/ubuntu/fastapi_project/static/;
+   }
+   ```
+4. **Restart Nginx:**
+   ```bash
+   sudo systemctl restart nginx
+   ```
+
+Now, static files will be available at:
+👉 `http://your-ec2-public-ip/static/filename.png`
+
+---
+
+## **🛠 Important Ubuntu Commands for Deployment**
+| Command | Description |
+|---------|-------------|
+| `sudo apt update` | Update package lists |
+| `sudo apt upgrade -y` | Upgrade installed packages |
+| `sudo systemctl start nginx` | Start Nginx |
+| `sudo systemctl restart nginx` | Restart Nginx |
+| `sudo systemctl status nginx` | Check Nginx status |
+| `sudo systemctl stop nginx` | Stop Nginx |
+| `sudo systemctl enable nginx` | Enable Nginx on startup |
+| `sudo systemctl disable nginx` | Disable Nginx on startup |
+| `sudo ufw allow 'Nginx Full'` | Allow Nginx traffic |
+| `sudo ufw enable` | Enable the firewall |
+| `sudo ufw status` | Check firewall status |
+| `nano filename` | Open file in nano editor |
+| `vim filename` | Open file in vim editor |
+| `sudo reboot` | Restart server |
+
+---
+
+### **🎯 Final Testing**
+Check:
+- `http://your-ec2-public-ip` (FastAPI running with Nginx)
+- `http://your-ec2-public-ip/docs` (Swagger API docs)
+- `http://your-ec2-public-ip/static/filename.png` (Static file serving)
+
+---
+
+### **🚀 Summary**
+1. **Connect to AWS EC2 using MobaXterm.**
+2. **Install FastAPI, Uvicorn, Nginx.**
+3. **Set up a FastAPI service with `systemd`.**
+4. **Configure Nginx as a reverse proxy.**
+5. **Enable firewall rules.**
+6. **Serve static files.**
+7. **Verify the deployment.**
+
+✅ **FastAPI is now running on AWS EC2 with Nginx!** 🎉  
+
+Let me know if you need more help! 😊 🚀

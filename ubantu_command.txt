@@ -1,0 +1,177 @@
+Here is a **comprehensive list of Ubuntu commands** categorized by their usage. These commands will help you navigate, manage files, processes, users, networking, and more.
+
+---
+
+# **📌 1. File and Directory Management**
+| **Action** | **Command** |
+|------------|------------|
+| Show current directory | `pwd` |
+| List files & directories | `ls` |
+| List all files (including hidden) | `ls -a` |
+| List files with details | `ls -l` |
+| Change directory | `cd /path/to/dir` |
+| Move one level up | `cd ..` |
+| Move to home directory | `cd ~` |
+| Create a directory | `mkdir dirname` |
+| Create multiple directories | `mkdir dir1 dir2 dir3` |
+| Delete an empty directory | `rmdir dirname` |
+| Delete a directory and its content | `rm -r dirname` |
+| Create a new file | `touch filename` |
+| Delete a file | `rm filename` |
+| Move or rename a file | `mv oldname newname` |
+| Copy a file | `cp file1 file2` |
+| Copy a directory | `cp -r dir1 dir2` |
+| View file contents | `cat filename` |
+| Open file for editing | `nano filename` |
+| View first 10 lines of a file | `head filename` |
+| View last 10 lines of a file | `tail filename` |
+| View file content page by page | `less filename` |
+
+---
+
+# **📌 2. System Information**
+| **Action** | **Command** |
+|------------|------------|
+| Show system hostname | `hostname` |
+| Show system information | `uname -a` |
+| Show CPU info | `lscpu` |
+| Show memory usage | `free -m` |
+| Show disk usage | `df -h` |
+| Show RAM usage in real-time | `htop` |
+| Show running processes | `ps aux` |
+| Check system logs | `journalctl -xe` |
+| Show Ubuntu version | `lsb_release -a` |
+| Show last system boot time | `who -b` |
+
+---
+
+# **📌 3. User Management**
+| **Action** | **Command** |
+|------------|------------|
+| Show current user | `whoami` |
+| Show all users | `cat /etc/passwd` |
+| Show logged-in users | `who` |
+| Add a new user | `sudo adduser username` |
+| Delete a user | `sudo deluser username` |
+| Switch user | `su username` |
+| Change user password | `passwd` |
+
+---
+
+# **📌 4. Process Management**
+| **Action** | **Command** |
+|------------|------------|
+| Show running processes | `ps aux` |
+| Show processes dynamically | `top` |
+| Kill a process by PID | `kill PID` |
+| Kill a process by name | `pkill processname` |
+| Restart a service | `sudo systemctl restart service_name` |
+| Stop a service | `sudo systemctl stop service_name` |
+| Start a service | `sudo systemctl start service_name` |
+| Check service status | `sudo systemctl status service_name` |
+
+---
+
+# **📌 5. Networking**
+| **Action** | **Command** |
+|------------|------------|
+| Show IP address | `ip a` or `ifconfig` |
+| Check internet connectivity | `ping google.com` |
+| Show active network connections | `netstat -tulnp` |
+| Show open ports | `ss -tulwn` |
+| Download a file from URL | `wget URL` |
+| Test connection to a server | `telnet server_ip port` |
+
+---
+
+# **📌 6. Package Management**
+| **Action** | **Command** |
+|------------|------------|
+| Update package list | `sudo apt update` |
+| Upgrade installed packages | `sudo apt upgrade -y` |
+| Install a package | `sudo apt install package_name` |
+| Remove a package | `sudo apt remove package_name` |
+| Search for a package | `apt search package_name` |
+| Show package details | `apt show package_name` |
+
+---
+
+# **📌 7. Disk and Storage**
+| **Action** | **Command** |
+|------------|------------|
+| Show disk usage | `df -h` |
+| Show free space on disk | `du -sh /path/to/dir` |
+| Mount a drive | `mount /dev/sdX /mnt` |
+| Unmount a drive | `umount /dev/sdX` |
+
+---
+
+# **📌 8. File Permissions**
+| **Action** | **Command** |
+|------------|------------|
+| Change file permissions | `chmod 777 filename` |
+| Change file owner | `chown user:group filename` |
+| Show file permissions | `ls -l filename` |
+
+---
+
+# **📌 9. SSH and Remote Access**
+| **Action** | **Command** |
+|------------|------------|
+| Connect to a remote server | `ssh user@server_ip` |
+| Copy file to remote server | `scp file.txt user@server:/path/` |
+| Copy file from remote server | `scp user@server:/path/file.txt .` |
+
+---
+
+# **📌 10. Logs & Monitoring**
+| **Action** | **Command** |
+|------------|------------|
+| View system logs | `journalctl -xe` |
+| View Nginx logs | `sudo tail -f /var/log/nginx/access.log` |
+| View Gunicorn logs | `sudo journalctl -u gunicorn --no-pager` |
+| View authentication logs | `cat /var/log/auth.log` |
+
+---
+
+## **🔥 Bonus Commands**
+### **1. Keep a process running in the background**
+```bash
+nohup python3 myscript.py &
+```
+(The `&` allows the command to run in the background)
+
+### **2. Find a file**
+```bash
+find / -name filename
+```
+(Searches for `filename` in all directories)
+
+### **3. Find a string inside files**
+```bash
+grep -rnw '/path/to/search/' -e 'text-to-find'
+```
+
+### **4. Monitor real-time system performance**
+```bash
+htop
+```
+
+---
+
+## **🎯 Summary**
+| **Category** | **Main Commands** |
+|-------------|------------------|
+| Navigation | `cd`, `ls`, `pwd` |
+| File Management | `touch`, `rm`, `mv`, `cp` |
+| User Management | `whoami`, `adduser`, `deluser` |
+| Process Management | `ps`, `top`, `kill` |
+| Networking | `ip a`, `ping`, `netstat` |
+| System Info | `uname -a`, `df -h`, `free -m` |
+| Package Management | `apt update`, `apt install` |
+| SSH & Remote | `ssh`, `scp` |
+| Logs & Monitoring | `journalctl`, `tail -f` |
+
+---
+
+🚀 **Now you are ready to manage your Ubuntu system like a pro!** Let me know if you need more details. 😊

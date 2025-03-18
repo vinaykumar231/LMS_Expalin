@@ -23,6 +23,7 @@ subquery = (
 
 
 
+
 ***************************** SQL all command **************
  create naw database
  CREATE DATABASE database_name;
