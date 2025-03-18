@@ -1,206 +1,125 @@
-To connect **Nginx, FastAPI, Database (MySQL/PostgreSQL), Models, and Schemas** together in a **production-ready setup**, follow these steps:
+### **🚀 Deploy FastAPI on AWS EC2 using Nginx & MobaXterm**  
+
+This guide will take you **step by step** on how to **clone your FastAPI project, configure Nginx, set up a service, and serve static files** using **MobaXterm** on an **AWS EC2 Ubuntu instance**.
 
 ---
 
-# **📌 Step-by-Step Deployment of a Complete FastAPI Project on AWS EC2 Using Nginx**
-✅ **What We Will Cover:**  
-1️⃣ **FastAPI Project Structure**  
-2️⃣ **Database Connection (MySQL/PostgreSQL)**  
-3️⃣ **Models & Schemas**  
-4️⃣ **FastAPI API Endpoints**  
-5️⃣ **Configuring Uvicorn & Gunicorn**  
-6️⃣ **Setting Up Nginx as a Reverse Proxy**  
-7️⃣ **Connecting Everything for Deployment**  
+## **🔹 Step 1: Connect to Your EC2 Instance via MobaXterm**  
+1. Open **MobaXterm**.  
+2. Click on **Session → SSH**.  
+3. Enter your **Public IP of EC2 instance** (e.g., `54.123.45.67`).  
+4. Under **Advanced SSH settings**, add your **.pem key file** (from AWS).  
+5. Click **OK** to connect.  
+
+✅ Now you're inside your Ubuntu EC2 instance.
 
 ---
 
-## **1️⃣ FastAPI Project Structure**
-Before deploying, let's define a **clean project structure**:
-
+## **🔹 Step 2: Install Required Packages**
+Run the following commands to install necessary packages:  
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install git python3-pip python3-venv nginx -y
 ```
-/home/ubuntu/myproject/
-│── app/
-│   ├── main.py              # FastAPI entry point
-│   ├── database.py          # Database connection
-│   ├── models.py            # SQLAlchemy models
-│   ├── schemas.py           # Pydantic schemas
-│   ├── routes/
-│   │   ├── users.py         # User routes
-│   │   ├── products.py      # Product routes
-│   ├── static/              # Static files (CSS, JS, images)
-│   │   ├── images/
-│   │   ├── styles/
-│   │   ├── scripts/
-│── nginx.conf               # Nginx configuration
-│── gunicorn_conf.py         # Gunicorn configuration
-│── requirements.txt         # Python dependencies
-│── .env                     # Environment variables
-```
+✅ This installs **Git**, **Python**, and **Nginx**.
 
 ---
 
-## **2️⃣ Database Connection (`database.py`)**
-First, **connect FastAPI to a database** (MySQL or PostgreSQL).
+## **🔹 Step 3: Clone Your FastAPI Project**
+Move to the home directory and clone your project:
+```bash
+cd /home/ubuntu
+git clone https://github.com/yourusername/your-fastapi-project.git
+```
+👉 **Replace** `yourusername/your-fastapi-project` with your actual GitHub repo.  
 
-📌 **Create `database.py`:**
-```python
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import os
-
-# Load environment variables
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASS = os.getenv("DB_PASS", "password")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "mydatabase")
-
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
-
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+Then, move inside the project:
+```bash
+cd your-fastapi-project
 ```
 
-✅ **Now, FastAPI is connected to MySQL/PostgreSQL.**
-
 ---
 
-## **3️⃣ Models (`models.py`)**
-📌 **Define a User Model in `models.py`:**
-```python
-from sqlalchemy import Column, Integer, String
-from .database import Base
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    password = Column(String(255), nullable=False)
+## **🔹 Step 4: Set Up a Virtual Environment**
+Create and activate a Python virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
-
-✅ **This defines a `users` table with `id, name, email, password`.**
+✅ This isolates project dependencies.
 
 ---
 
-## **4️⃣ Pydantic Schemas (`schemas.py`)**
-📌 **Create `schemas.py` to validate API requests:**
-```python
-from pydantic import BaseModel, EmailStr
-
-class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: str
-
-    class Config:
-        from_attributes = True
+## **🔹 Step 5: Install FastAPI & Uvicorn**
+Install required dependencies:
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
-
-✅ **This ensures proper validation when sending data to API endpoints.**
-
----
-
-## **5️⃣ Create API Endpoints (`routes/users.py`)**
-📌 **Create `users.py` inside `routes/`:**
-```python
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models import User
-from ..schemas import UserCreate, UserResponse
-from passlib.context import CryptContext
-
-router = APIRouter()
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-@router.post("/register", response_model=UserResponse)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    hashed_password = pwd_context.hash(user.password)
-    new_user = User(name=user.name, email=user.email, password=hashed_password)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
-@router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+If `requirements.txt` does not exist, install manually:
+```bash
+pip install fastapi uvicorn gunicorn
 ```
-
-✅ **Now, FastAPI has:**
-- **`/register`** → Create a user  
-- **`/users/{id}`** → Get user details  
+✅ This installs **FastAPI, Uvicorn, and Gunicorn**.
 
 ---
 
-## **6️⃣ Main FastAPI Entry (`main.py`)**
-📌 **Create `main.py`:**
-```python
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from .routes import users
-
-app = FastAPI()
-
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Include routes
-app.include_router(users.router)
-
-@app.get("/")
-def root():
-    return {"message": "FastAPI + Nginx Deployment Working!"}
+## **🔹 Step 6: Run FastAPI Locally (Test)**
+To check if FastAPI is working, run:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-✅ **This initializes FastAPI and mounts `users.py` routes.**
-
----
-
-## **7️⃣ Configure Gunicorn (`gunicorn_conf.py`)**
-📌 **Create `gunicorn_conf.py`:**
-```python
-workers = 4
-bind = "0.0.0.0:8000"
-worker_class = "uvicorn.workers.UvicornWorker"
+✅ Open **EC2 Public IP** in the browser:  
 ```
-✅ **Gunicorn will run FastAPI with 4 workers.**
+http://YOUR_EC2_PUBLIC_IP:8000/docs
+```
+If FastAPI loads, the setup is working!
 
 ---
 
-## **8️⃣ Set Up Nginx Configuration (`nginx.conf`)**
-📌 **Create `/etc/nginx/sites-available/fastapi`:**
+## **🔹 Step 7: Set Up Systemd Service for FastAPI**
+Stop the running server (`Ctrl + C`) and create a systemd service file:
+```bash
+sudo nano /etc/systemd/system/fastapi.service
+```
+Paste the following:
+```ini
+[Unit]
+Description=FastAPI Application
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/your-fastapi-project
+ExecStart=/home/ubuntu/your-fastapi-project/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+👉 **Save & exit:** `Ctrl + X`, then `Y`, then `Enter`.  
+
+Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable fastapi
+sudo systemctl start fastapi
+sudo systemctl status fastapi
+```
+✅ Your FastAPI app is now running **in the background**.
+
+---
+
+## **🔹 Step 8: Configure Nginx as a Reverse Proxy**
+Open the Nginx config file:
+```bash
+sudo nano /etc/nginx/sites-available/fastapi
+```
+Paste this configuration:
 ```nginx
 server {
     listen 80;
-    server_name your-ec2-public-ip;
-
-    location /static/ {
-        alias /home/ubuntu/myproject/app/static/;
-        autoindex on;
-    }
+    server_name YOUR_EC2_PUBLIC_IP;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -209,69 +128,88 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    location /static/ {
+        alias /home/ubuntu/your-fastapi-project/static/;
+    }
 }
 ```
+👉 **Replace** `YOUR_EC2_PUBLIC_IP` with your actual EC2 IP.  
+👉 **Save & exit:** `Ctrl + X`, then `Y`, then `Enter`.
 
-### **Enable Nginx Configuration:**
+Now, enable the configuration:
 ```bash
 sudo ln -s /etc/nginx/sites-available/fastapi /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
 ```
-
-✅ **Now, Nginx serves FastAPI & static files.**
+✅ This links the config to **sites-enabled**.
 
 ---
 
-## **9️⃣ Run FastAPI in the Background**
-### **Using Gunicorn + Uvicorn**
+## **🔹 Step 9: Set File Permissions for Static Files**
+Make sure Nginx can read the static files:
 ```bash
-gunicorn -c gunicorn_conf.py app.main:app
+sudo chmod -R 755 /home/ubuntu/your-fastapi-project/static/
+sudo chown -R www-data:www-data /home/ubuntu/your-fastapi-project/static/
 ```
-
-✅ **FastAPI is now running on `http://your-ec2-public-ip/`.**
-
----
-
-## **🔟 Final Testing**
-📌 Open your browser & test your FastAPI APIs:
-
-🔹 **Check API Root:**
-```
-http://your-ec2-public-ip/
-```
-
-🔹 **Register a User (POST Request):**
-```
-http://your-ec2-public-ip/register
-```
-Request Body:
-```json
-{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "securepassword"
-}
-```
-
-🔹 **Fetch User Details:**
-```
-http://your-ec2-public-ip/users/1
-```
-
-🔹 **Static File Access:**
-```
-http://your-ec2-public-ip/static/images/logo.png
-```
+✅ This prevents **403 Forbidden errors**.
 
 ---
 
-## **✅ Summary**
-🚀 **Now, everything is deployed & working:**
-✔ **FastAPI** (Backend API)  
-✔ **MySQL/PostgreSQL** (Database)  
-✔ **Nginx** (Reverse Proxy)  
-✔ **Gunicorn** (Process Manager)  
-✔ **Static File Hosting**  
+## **🔹 Step 10: Restart Nginx & Allow Firewall**
+Restart Nginx:
+```bash
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+```
+Allow traffic:
+```bash
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
+sudo ufw status
+```
+✅ Now, Nginx should serve FastAPI!
 
-Let me know if you have any issues! 😊🚀
+---
+
+## **🔹 Step 11: Test the Deployment**
+Visit your **EC2 Public IP** in a browser:
+```
+http://YOUR_EC2_PUBLIC_IP/
+```
+If everything works, 🎉 **Your FastAPI app is live with Nginx!**
+
+---
+
+## **🔹 Step 12: Debugging & Logs**
+If issues occur, check logs:
+
+- **FastAPI logs**  
+  ```bash
+  sudo journalctl -u fastapi --no-pager --lines=50
+  ```
+- **Nginx logs**  
+  ```bash
+  sudo tail -f /var/log/nginx/error.log
+  ```
+- **Firewall issues**  
+  ```bash
+  sudo ufw status
+  ```
+
+---
+
+## **🎯 Summary**
+| **Step** | **Command** |
+|----------|------------|
+| **1. Connect to EC2** | SSH into EC2 via MobaXterm |
+| **2. Install dependencies** | `sudo apt install git python3-pip python3-venv nginx -y` |
+| **3. Clone project** | `git clone <repo>` |
+| **4. Create Virtual Environment** | `python3 -m venv venv && source venv/bin/activate` |
+| **5. Install FastAPI** | `pip install fastapi uvicorn gunicorn` |
+| **6. Test FastAPI** | `uvicorn main:app --host 0.0.0.0 --port 8000 --reload` |
+| **7. Create FastAPI Service** | `sudo nano /etc/systemd/system/fastapi.service` |
+| **8. Configure Nginx** | `sudo nano /etc/nginx/sites-available/fastapi` |
+| **9. Set Permissions** | `sudo chmod -R 755 static/ && sudo chown -R www-data:www-data static/` |
+| **10. Restart Services** | `sudo systemctl restart nginx && sudo systemctl restart fastapi` |
+
+🚀 **Now, your FastAPI app is deployed successfully on AWS EC2 with Nginx!** 🎉
