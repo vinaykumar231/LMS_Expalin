@@ -1,0 +1,160 @@
+Absolutely! Here's a **future-proof, step-by-step guide** for setting up **Google OAuth login in FastAPI**, from scratch to deployment. This will help you and your team re-use or scale this in any project.
+
+---
+
+## ✅ Step-by-Step: Google OAuth with FastAPI
+
+---
+
+### 🔧 STEP 1: Set Up Google Cloud Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create a new **project**
+3. Enable the **Google+ API** and **OAuth 2.0 API** (or just `People API` if Google+ is gone)
+4. Go to **Credentials** > **Create Credentials** > **OAuth client ID**
+5. Choose "Web Application"
+6. Set:
+   - **Authorized redirect URI**: e.g., `http://localhost:8000/v1/auth/google/callback`
+7. Save the `Client ID` and `Client Secret`
+
+---
+
+### 📁 STEP 2: Set Environment Variables (`.env`)
+
+```env
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
+GOOGLE_PROJECT_ID=your-google-project-id
+```
+
+---
+
+### 📦 STEP 3: Install Required Packages
+
+```bash
+pip install fastapi[all] google-auth-oauthlib requests python-dotenv sqlalchemy
+```
+
+---
+
+### 🧠 STEP 4: Create OAuth Flow (`google_login`)
+
+```python
+@router.get("/v1/auth/google/login")
+async def google_login():
+    flow = Flow.from_client_config(
+        client_secrets,
+        scopes=SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI
+    )
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent"
+    )
+    return RedirectResponse(authorization_url)
+```
+
+---
+
+### 🔁 STEP 5: Google Callback Handler
+
+```python
+@router.get("/v1/auth/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    code = request.query_params.get("code")
+    flow = Flow.from_client_config(client_secrets, scopes=SCOPES, redirect_uri=GOOGLE_REDIRECT_URI)
+    flow.fetch_token(code=code)
+    credentials = flow.credentials
+
+    userinfo_response = requests.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {credentials.token}"}
+    )
+    user_info = userinfo_response.json()
+```
+
+---
+
+### 🧑‍💻 STEP 6: Create or Fetch User in DB
+
+```python
+existing_user = db.query(User).filter(User.email == user_info["email"]).first()
+
+if not existing_user:
+    new_user = User(
+        username=user_info["name"],
+        email=user_info["email"],
+        password_hash="GOOGLE_AUTH",
+        ...
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+```
+
+---
+
+### 🔐 STEP 7: Issue JWT Token
+
+```python
+token, exp = signJWT(user.user_id, user.user_type)
+return {
+    "token": token,
+    "email": user.email,
+    "user_type": user.user_type,
+    ...
+}
+```
+
+---
+
+### 🌐 STEP 8: Redirect to Frontend (optional)
+
+You can redirect like this instead of returning JSON:
+
+```python
+return RedirectResponse(f"http://localhost:3000/dashboard?token={token}")
+```
+
+---
+
+### 🧪 STEP 9: Test Locally
+
+1. Run FastAPI:
+```bash
+uvicorn main:app --reload
+```
+
+2. Go to:
+```
+http://localhost:8000/v1/auth/google/login
+```
+
+3. Login with your Google account
+4. Callback hits FastAPI, user gets JWT token or redirected
+
+---
+
+### 🚀 STEP 10: Production Checklist
+
+- ✅ Use HTTPS (Google requires secure redirect URIs in production)
+- ✅ Handle expired access tokens
+- ✅ Store refresh tokens if needed
+- ✅ Secure JWT (add expiration, secrets, etc.)
+- ✅ Use domain-verified Google app
+- ✅ CORS setup between frontend and backend
+
+---
+
+## 📝 Pro Tips
+
+- 🔁 `access_type="offline"` → gets refresh token
+- 🔄 `prompt="consent"` → forces user to pick account
+- 🔐 Store `state` in session to prevent CSRF (for extra security)
+- 💻 Use OAuth Playground to test: https://developers.google.com/oauthplayground/
+
+---
+
+Let me know if you want a full **frontend example**, **refresh token flow**, or **session management** using cookies.

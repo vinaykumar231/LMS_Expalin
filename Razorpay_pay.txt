@@ -1,0 +1,204 @@
+1. Initial Setup
+
+Create a Razorpay Account
+
+Sign up at Razorpay Dashboard
+Complete KYC verification process
+Generate API keys (Key ID and Secret Key)
+
+
+Install Required Dependencies
+bashpip install razorpay fastapi pydantic sqlalchemy httpx
+
+Environment Configuration
+
+Set up environment variables for Razorpay credentials
+
+pythonRAZORPAY_KEY = os.getenv("RAZORPAY_KEY")
+RAZORPAY_SECRET = os.getenv("RAZORPAY_SECRET")
+
+
+python@router.post("/create-order")
+async def create_order(
+    request: CreateOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Initialize Razorpay client
+        client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
+        
+        # Create order data
+        order_data = {
+            "amount": int(request.amount * 100),  # Amount in paise
+            "currency": request.currency,
+            "receipt": request.receipt or f"receipt_{current_user.user_id}_{int(time.time())}"
+        }
+        
+        # Create Razorpay order
+        order = client.order.create(data=order_data)
+        
+        # Store order in database
+        payment = Payment(
+            user_id=current_user.user_id,
+            amount=request.amount,
+            final_amount=request.amount,
+            currency=request.currency,
+            razorpay_order_id=order["id"],
+            status="created"
+        )
+        
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+        
+        return {
+            "status": "success",
+            "order_id": order["id"],
+            "amount": request.amount,
+            "key": RAZORPAY_KEY,  # Client needs this to initialize Razorpay checkout
+            "order_details": order
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment order")
+
+4.2 Verify Payment Endpoint
+python@router.post("/verify-payment")
+async def verify_payment(
+    request: VerifyPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Create signature verification data
+        params_dict = {
+            'razorpay_order_id': request.razorpay_order_id,
+            'razorpay_payment_id': request.razorpay_payment_id,
+            'razorpay_signature': request.razorpay_signature
+        }
+        
+        # Initialize Razorpay client
+        client = razorpay.Client(auth=(RAZORPAY_KEY, RAZORPAY_SECRET))
+        
+        # Verify signature
+        client.utility.verify_payment_signature(params_dict)
+        
+        # Get payment details from Razorpay
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.razorpay.com/v1/payments/{request.razorpay_payment_id}",
+                auth=(RAZORPAY_KEY, RAZORPAY_SECRET)
+            )
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, 
+                                detail="Failed to fetch payment details from Razorpay")
+        
+        payment_data = response.json()
+        
+        # Update payment in database
+        payment = db.query(Payment).filter(
+            Payment.razorpay_order_id == request.razorpay_order_id
+        ).first()
+        
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment record not found")
+        
+        payment.razorpay_payment_id = request.razorpay_payment_id
+        payment.status = payment_data.get("status", "failed")
+        payment.updated_on = datetime.utcnow()
+        
+        db.commit()
+        
+        return {
+            "status": "success",
+            "payment_id": payment.payment_id,
+            "message": "Payment verified successfully"
+        }
+    except razorpay.errors.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid payment signature")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error verifying payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify payment")
+
+
+######################### frontend ###################
+
+ const res = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
+    if (!res) {
+      setIsLoading(false);
+      Swal.fire({
+        icon: 'error',
+        title: 'SDK Error',
+        text: 'Failed to load Razorpay SDK',
+        confirmButtonColor: '#3085d6',
+      });
+      return;
+    }
+
+    try {
+      const { data } = await axios.post(
+        `/api/pay-next-installment?installment_number=${selectedInstallment.installment_number}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      const options = {
+        key: "rzp_test_hqWvVqOn8QFGEF",
+        amount: data.amount * 100,
+        currency: data.currency,
+        name: 'LMS Payment',
+        description: `Installment ${data.installment_number}`,
+        order_id: data.order_id,
+        handler: async function (response) {
+          try {
+            const paymentData = {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              installment_number: data.installment_number,
+            };
+
+            await axios.post(
+              '/api/verify-payment-callback',
+              paymentData,
+              {
+                headers: {
+                  Authorization: `Bearer ${user.token}`,
+                },
+              }
+            );
+
+            Swal.fire({
+              icon: 'success',
+              title: 'Success',
+              text: 'Payment completed successfully!',
+              confirmButtonColor: '#3085d6',
+            }).then(() => {
+              // Refresh installments data
+              fetchAllInstallments();
+            });
+          } catch (error) {
+            handleError(error);
+          }
+        },
+        theme: {
+          color: '#2e8b57',
+        },
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
