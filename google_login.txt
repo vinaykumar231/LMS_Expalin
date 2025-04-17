@@ -6,6 +6,8 @@ Absolutely! Here's a **future-proof, step-by-step guide** for setting up **Googl
 
 using google-auth-oauthlib library and Flow class to implement the OAuth 2.0 authorization
 
+important : also enbale google peope API
+
 ---
 
 ### 🔧 STEP 1: Set Up Google Cloud Credentials
