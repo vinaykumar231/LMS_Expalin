@@ -160,3 +160,98 @@ http://localhost:8000/v1/auth/google/login
 ---
 
 Let me know if you want a full **frontend example**, **refresh token flow**, or **session management** using cookies.
+
+###################################################################
+
+Yes — to make **Google Login** (OAuth 2.0) work, you **must configure everything properly in the [Google Cloud Console](https://console.cloud.google.com/)**. Here’s a **step-by-step guide** to set it up from scratch:
+
+---
+
+## ✅ Step-by-Step: Enable Google OAuth Login
+
+### 1️⃣ Go to Google Cloud Console
+- Visit: [https://console.cloud.google.com](https://console.cloud.google.com)
+- Sign in with your Google account.
+
+---
+
+### 2️⃣ Create or Select a Project
+- Click the project drop-down at the top.
+- Choose an existing project or click **"New Project"**.
+
+---
+
+### 3️⃣ Enable the **OAuth Consent Screen**
+- From the left menu: **APIs & Services > OAuth consent screen**
+- Choose **"External"** (if public users will log in).
+- Fill in:
+  - App name
+  - Support email
+  - Developer contact email
+
+✅ Save and continue through Scopes and Test Users (you can add your email as a test user if the app is not in production).
+
+---
+
+### 4️⃣ Enable the OAuth API
+- Go to: **APIs & Services > Library**
+- Search: `Google+ API` or `Google Identity Services`
+- Enable **“Google Identity Services”**
+
+---
+
+### 5️⃣ Create OAuth 2.0 Credentials
+- Go to: **APIs & Services > Credentials**
+- Click **"+ Create Credentials" > OAuth client ID**
+- App Type: **Web application**
+
+Then set:
+
+#### ➤ Name:
+`My FastAPI OAuth Client`
+
+#### ➤ Authorized JavaScript origins:
+```
+http://localhost:3000   (if frontend runs here)
+```
+
+#### ➤ Authorized redirect URIs:
+```
+http://localhost:8000/auth/google/callback   (or whatever your backend callback URL is)
+```
+
+✅ Click **Create**, and you’ll get:
+
+- **Client ID**
+- **Client Secret**
+
+Copy both and add them to your `.env` or FastAPI config.
+
+---
+
+### 6️⃣ Add to Backend `.env`
+
+```env
+GOOGLE_CLIENT_ID=your_client_id_here
+GOOGLE_CLIENT_SECRET=your_client_secret_here
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+GOOGLE_PROJECT_ID=your_project_id_if_needed
+```
+
+---
+
+### 7️⃣ Done ✅
+
+You’ve now configured everything:
+
+- Google Console is ready
+- Client secrets are set
+- You can now handle login, get the user’s email/name/picture from `id_token`
+
+---
+
+### Need Help With Frontend Integration?
+
+If you want to also handle login using a "Sign in with Google" button on the frontend (React or other), I can give you that as well.
+
+Want it?
